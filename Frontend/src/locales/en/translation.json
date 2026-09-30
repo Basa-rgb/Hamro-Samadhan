@@ -1,0 +1,448 @@
+﻿{
+  "topBarText": {
+    "topic": "Government of Nepal",
+    "topics": "Civil Service"
+  },
+  "government": {
+    "name": "Government of Nepal",
+    "service": "Hamro Samadhan Public Service",
+    "location": "Singhadurbar, Kathmandu, Nepal"
+  },
+  "nav": {
+    "home": "Home",
+    "reportIssue": "Report Issue",
+    "trackReport": "Track Report",
+    "howItWorks": "How It Works"
+  },
+  "home": {
+    "title": "Report Public Issues",
+    "description": "Help improve your community by reporting public problems.",
+    "reportButton": "Report an Issue"
+  },
+  "navbar": {
+    "home": "Home",
+    "reportIssue": "Report Issue",
+    "trackReport": "Track Report",
+    "howItWorks": "How It Works"
+  },
+  "hero": {
+    "badge": "COMMUNITY PUBLIC SERVICE",
+    "title": "A better community starts with",
+    "highlight": "speaking up.",
+    "description": "Report public problems in your area and help bring them to the attention of the right people. Together, let's make our municipality transparent and responsive.",
+    "reportButton": "Report a Problem"
+  },
+  "report": {
+    "header": {
+      "title": "REPORT A PUBLIC ISSUE",
+      "subtitle": "Help improve your community by reporting a public problem."
+    },
+    "steps": {
+      "issue": "Issue",
+      "location": "Location",
+      "you": "You"
+    },
+    "success": {
+      "title": "Report submitted successfully",
+      "description": "Save this report ID to track its status.",
+      "copyId": "Copy ID",
+      "copied": "Copied",
+      "reportAnother": "Report another issue"
+    },
+    "issueSection": {
+      "title": "Issue Information",
+      "subtitle": "Tell us about the public problem you want to report."
+    },
+    "locationSection": {
+      "title": "Location Information",
+      "subtitle": "Tell us where the problem is located."
+    },
+    "reporterSection": {
+      "title": "Your Information",
+      "subtitle": "Provide your contact information so we can send you report updates."
+    },
+    "fields": {
+      "title": "Issue Title",
+      "titlePlaceholder": "e.g. Large pothole on main road",
+      "category": "Category",
+      "categoryPlaceholder": "Select a category",
+      "description": "Description",
+      "descriptionPlaceholder": "Describe the problem in detail...",
+      "charLimit": "Maximum 2000 characters",
+      "photo": "Photo",
+      "uploadImage": "Upload Image",
+      "fileHint": "PNG, JPG up to 5MB",
+      "fileSize": "({{size}} MB)",
+      "removeImage": "Remove image",
+      "photoHint": "Upload a clear photo of the reported issue",
+      "previewAlt": "Selected image preview",
+      "uploadAlt": "Upload",
+      "address": "Address",
+      "addressPlaceholder": "Enter the address of the issue",
+      "useMyLocation": "Use My Location",
+      "locationPermissionHint": "Allow location access to automatically detect your current location.",
+      "latitude": "Latitude",
+      "longitude": "Longitude",
+      "locationDetected": "Location detected",
+      "locationDetectedHint": "Your location coordinates will be attached to this report.",
+      "mapPreview": "Location Preview",
+      "mapHint": "Click on the map to move the pin.",
+      "fullName": "Full Name",
+      "fullNamePlaceholder": "Enter your full name",
+      "email": "Email Address",
+      "emailPlaceholder": "Enter your email address",
+      "phone": "Phone Number",
+      "phonePlaceholder": "e.g. 9812345678",
+      "privacyTitle": "Your information is protected",
+      "privacyDescription": "Your personal information will be handled responsibly and will not be displayed publicly with your report."
+    },
+    "requiredNote": {
+      "before": "Fields marked with",
+      "after": "are required."
+    },
+    "submit": {
+      "idle": "Submit Report",
+      "loading": "Submitting..."
+    },
+    "categories": {
+      "road_damage": "Road Damage",
+      "road_blockage": "Road Blockage",
+      "street_light": "Street Light",
+      "waste": "Waste Management",
+      "water_leakage": "Water Leakage",
+      "drainage": "Drainage",
+      "traffic_signal": "Traffic Signal",
+      "fallen_tree": "Fallen Tree",
+      "public_infrastructure": "Public Infrastructure",
+      "other": "Other"
+    },
+    "errors": {
+      "loadCategories": "Unable to load categories",
+      "titleRequired": "Issue title is required",
+      "categoryRequired": "Please choose a category",
+      "descriptionRequired": "Description is required",
+      "descriptionTooLong": "Description cannot exceed 2000 characters",
+      "addressRequired": "Address is required",
+      "nameRequired": "Full name is required",
+      "emailRequired": "Email is required",
+      "emailInvalid": "Enter a valid email address",
+      "phoneRequired": "Phone number is required",
+      "phoneInvalid": "Enter a valid 10 digit phone number",
+      "imageRequired": "Please upload an image",
+      "imageTooLarge": "Image cannot exceed 5MB",
+      "fixFields": "Please fix the highlighted fields",
+      "geoFailed": "Unable to detect the location",
+      "generic": "Something went wrong. Please try again"
+    }
+  },
+  "track": {
+    "header": {
+      "title": "TRACK YOUR REPORT",
+      "subtitle": "Enter the report ID you received to see the current status of your report and every update made since it was submitted."
+    },
+    "search": {
+      "label": "Report ID",
+      "placeholder": "HS-2026-000013",
+      "submit": "Track report",
+      "loading": "Checking...",
+      "clear": "Clear",
+      "noLogin": "You do not need to sign in or create an account.",
+      "helpTitle": "Where can I find my report ID?",
+      "helpBody": "The report ID is shown on screen immediately after you submit a report.",
+      "recent": "Recently checked",
+      "removeRecent": "Remove"
+    },
+    "errors": {
+      "idRequired": "Please enter a report ID.",
+      "notFound": "No report was found for that ID. Please check the ID and try again.",
+      "generic": "The report could not be loaded. Please try again in a moment."
+    },
+    "empty": {
+      "title": "How to check a report",
+      "body": "Every report you submit is given an ID. Enter that ID above to see the status of the report and the updates made on it.",
+      "step1": "Submit a report for a public issue",
+      "step2": "Note the report ID shown on screen after submitting",
+      "step3": "Enter the ID above whenever you want to check the status"
+    },
+    "loading": "Loading the report...",
+    "found": {
+      "title": "Report Found",
+      "body": "Here are the details and latest updates for your report."
+    },
+    "labels": {
+      "status": "Status",
+      "createdAt": "Created At",
+      "latitude": "Lat",
+      "longitude": "Long",
+      "title": "Title",
+      "description": "Description"
+    },
+    "issue": {
+      "title": "Issue Details",
+      "noPhoto": "No photo was submitted with this report."
+    },
+    "timeline": {
+      "title": "Tracking Timeline",
+      "expected": "Expected update",
+      "expectedBody": "You will be notified when there is a new update."
+    },
+    "result": {
+      "reportId": "Report ID",
+      "copyId": "Copy",
+      "copied": "Copied",
+      "submitted": "Submitted",
+      "lastUpdate": "Last update",
+      "openLabel": "Time open",
+      "openFor_one": "{{count}} day",
+      "openFor_other": "{{count}} days",
+      "updates_one": "{{count}} update",
+      "updates_other": "{{count}} updates",
+      "department": "Department",
+      "notAssigned": "Not yet assigned",
+      "noUpdate": "No update yet",
+      "photoAlt": "Photo submitted with this report",
+      "openMap": "Open map",
+      "coordinates": "Coordinates",
+      "noAddress": "No address was recorded for this report."
+    },
+    "priority": {
+      "label": "Priority",
+      "LOW": "Low",
+      "MEDIUM": "Normal",
+      "HIGH": "High",
+      "URGENT": "Urgent"
+    },
+    "categoryLabel": "Category",
+    "status": {
+      "PENDING": {
+        "label": "Received",
+        "note": "Your report has been received and is waiting to be reviewed.",
+        "next": "A reviewer will check the details of your report and forward it to the department responsible for this type of issue."
+      },
+      "UNDER_REVIEW": {
+        "label": "Under review",
+        "note": "Your report is being reviewed by the department.",
+        "next": "Once the review is complete, the report will be assigned to the team that will carry out the work."
+      },
+      "IN_PROGRESS": {
+        "label": "In progress",
+        "note": "The work for your report has started.",
+        "next": "You will receive an update once the work has been carried out and the report is closed."
+      },
+      "RESOLVED": {
+        "label": "Resolved",
+        "note": "The issue in your report has been resolved.",
+        "next": "If the same problem happens again, submit a new report and mention this report ID."
+      },
+      "REJECTED": {
+        "label": "Not accepted",
+        "note": "This report was not accepted.",
+        "next": "Submit a new report with more specific details, or contact the department directly."
+      }
+    },
+    "steps": {
+      "received": "Received",
+      "review": "Under review",
+      "fixing": "In progress",
+      "done": "Resolved",
+      "complete": "All stages completed"
+    },
+    "history": {
+      "title": "Update history",
+      "subtitle": "Every change made to this report, newest last.",
+      "submitted": "Report submitted",
+      "noMore": "This is the most recent update.",
+      "noMoreBody": "Any further update will be listed here and sent to your email address."
+    },
+    "report": {
+      "title": "Report details"
+    },
+    "place": {
+      "title": "Location",
+      "noCoords": "No map location was recorded for this report."
+    },
+    "next": {
+      "title": "Next step",
+      "notifyBody": "You are emailed at every status change, so you do not need to keep checking this page."
+    },
+    "photo": {
+      "close": "Close photo"
+    },
+    "reset": "Track a different report",
+    "links": {
+      "reportAnother": "Report another issue",
+      "howItWorks": "How it works"
+    }
+  },
+  "howItWorks": {
+    "header": {
+      "title": "HOW IT WORKS",
+      "subtitle": "Reporting a public issue takes only a few minutes. Follow these four simple steps."
+    },
+    "steps": {
+      "describe": {
+        "title": "Describe the issue",
+        "description": "Choose a category, write a short title and add a clear photo of the problem."
+      },
+      "locate": {
+        "title": "Add the location",
+        "description": "Enter the address or use your current location and drop a pin on the map."
+      },
+      "submit": {
+        "title": "Submit the report",
+        "description": "Send the report and save the report ID you receive on screen."
+      },
+      "track": {
+        "title": "Track the progress",
+        "description": "Use the report ID to check the status and see when the issue is resolved."
+      }
+    },
+    "cta": {
+      "reportButton": "Report a Problem"
+    }
+  },
+  "about": {
+    "header": {
+      "title": "ABOUT US",
+      "subtitle": "A citizen platform that connects the people of our municipality with the people who can solve their problems."
+    },
+    "mission": {
+      "title": "Our Mission",
+      "description": "Hamro Samadhan exists to make local governance visible and accountable. Many public problems go unaddressed simply because nobody reported them. We give every citizen a simple way to raise these issues, and a clear way to follow what happened next.",
+      "imageAlt": "Citizens working together in the community",
+      "flagAlt": "National flag of Nepal"
+    },
+    "values": {
+      "transparency": {
+        "title": "Transparency",
+        "description": "Every report and its progress stays open for the public to see."
+      },
+      "community": {
+        "title": "Community Driven",
+        "description": "Reports come from the people who live with the problem every day."
+      },
+      "trust": {
+        "title": "Citizen Trust",
+        "description": "Your personal details are handled responsibly and never shown publicly."
+      }
+    },
+    "cta": {
+      "reportButton": "Report a Problem"
+    }
+  },
+  "guidelines": {
+    "header": {
+      "title": "REPORT GUIDELINES",
+      "subtitle": "A clear report is resolved faster. Follow these simple tips to get your problem fixed."
+    },
+    "tips": {
+      "title": "Before you report",
+      "subtitle": "Three things that make a report much easier for the right team to act on.",
+      "precise": {
+        "title": "Be precise",
+        "description": "Name the exact road, landmark or ward so the issue can be found on the first try."
+      },
+      "photo": {
+        "title": "Add a clear photo",
+        "description": "A sharp daylight photo showing the whole problem helps far more than a description alone."
+      },
+      "contact": {
+        "title": "Stay reachable",
+        "description": "Give a working phone number or email so officials can ask questions or confirm the fix."
+      }
+    },
+    "include": {
+      "doTitle": "Please do",
+      "dontTitle": "Please don't",
+      "do": [
+        "Describe the problem in your own words",
+        "Report one issue per report",
+        "Add the photo and the exact location",
+        "Check the details before you submit"
+      ],
+      "dont": [
+        "Do not write rude or personal comments",
+        "Do not report the same issue many times",
+        "Do not post someone else's private information",
+        "Do not use the form for complaints about a person"
+      ]
+    },
+    "cta": {
+      "reportButton": "Report a Problem"
+    }
+  },
+  "faq": {
+    "header": {
+      "title": "FREQUENTLY ASKED QUESTIONS",
+      "subtitle": "Answers to the questions citizens ask most often about reporting and tracking issues."
+    },
+    "loading": "Loading questions...",
+    "empty": "No questions have been added yet.",
+    "errors": {
+      "loadFaqs": "Unable to load questions"
+    },
+    "cta": {
+      "reportButton": "Report a Problem",
+      "guidelinesButton": "Read the Guidelines"
+    }
+  },
+  "footer": {
+    "brand": {
+      "description": "A platform that helps citizens report public issues, track their progress, and contribute to a better community."
+    },
+    "social": {
+      "title": "Follow Us"
+    },
+    "trust": {
+      "title": "Citizen Trust",
+      "heading": "Your Information Matters",
+      "description": "Your personal information is handled responsibly and is not displayed publicly with your report."
+    },
+    "quickLinks": {
+      "title": "Quick Links",
+      "home": "Home",
+      "reportIssue": "Report an Issue",
+      "trackReport": "Track Report",
+      "howItWorks": "How It Works",
+      "about": "About Us"
+    },
+    "citizenServices": {
+      "title": "Citizen Services",
+      "reportIssue": "Report a Public Issue",
+      "trackReport": "Track Your Report",
+      "faq": "Frequently Asked Questions",
+      "guidelines": "Report Guidelines"
+    },
+    "contact": {
+      "title": "Contact Us",
+      "email": "info@hamrosamadhan.com",
+      "phone": "+977 9749328435",
+      "address": "Kathmandu, Nepal",
+      "hours": "Sunday - Friday: 10:00 AM - 5:00 PM"
+    },
+    "features": {
+      "easyReporting": {
+        "title": "Easy Reporting",
+        "description": "Report public issues easily"
+      },
+      "trackReports": {
+        "title": "Track Reports",
+        "description": "Follow your report status"
+      },
+      "secureInformation": {
+        "title": "Secure Information",
+        "description": "Your information is protected"
+      },
+      "citizenSupport": {
+        "title": "Citizen Support",
+        "description": "We're here to help"
+      }
+    },
+    "bottom": {
+      "copyright": "Â© 2026 Hamro Samadhan. All rights reserved.",
+      "privacy": "Privacy Policy",
+      "terms": "Terms & Conditions",
+      "sitemap": "Sitemap"
+    }
+  }
+}
