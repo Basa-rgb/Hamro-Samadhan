@@ -47,6 +47,7 @@ const Report = () => {
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("");
   const [categories, setCategories] = useState([]);
+  const [categoriesError, setCategoriesError] = useState(false);
   const [description, setDescription] = useState("");
   const [address, setAddress] = useState("");
   const [name, setName] = useState("");
@@ -93,17 +94,22 @@ const Report = () => {
   const clearError = (name) =>
     setErrors((prev) => ({ ...prev, [name]: undefined }));
 
-  useEffect(() => {
-    // Options come from the backend, so a new category needs no frontend change
-    const loadCategories = async () => {
-      try {
-        const response = await getCategories();
-        setCategories(response.categories);
-      } catch {
-        setErrorMsg(t("report.errors.loadCategories"));
-      }
-    };
+  // Options come from the backend, so a new category needs no frontend change.
+  // A failed load has to be visible on the field itself, an empty <select> is
+  // indistinguishable from a form that simply has nothing to pick yet
+  const loadCategories = async () => {
+    try {
+      const response = await getCategories();
+      setCategories(response.categories);
+      setCategoriesError(false);
+    } catch {
+      setCategories([]);
+      setCategoriesError(true);
+      setErrorMsg(t("report.errors.loadCategories"));
+    }
+  };
 
+  useEffect(() => {
     loadCategories();
   }, [t]);
 
@@ -341,10 +347,13 @@ const Report = () => {
                   setCategory(e.target.value);
                   clearError("category");
                 }}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-700 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition cursor-pointer"
+                disabled={categoriesError}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-700 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition cursor-pointer disabled:bg-gray-100 disabled:cursor-not-allowed"
               >
                 <option value="" disabled>
-                  {t("report.fields.categoryPlaceholder")}
+                  {categoriesError
+                    ? t("report.fields.categoryUnavailable")
+                    : t("report.fields.categoryPlaceholder")}
                 </option>
 
                 {categories.map((item) => (
@@ -359,7 +368,21 @@ const Report = () => {
                   </option>
                 ))}
               </select>
-              {fieldError("category")}
+
+              {categoriesError ? (
+                <p className="text-xs text-red-600 mt-1">
+                  {t("report.errors.loadCategories")}
+                  <button
+                    type="button"
+                    onClick={loadCategories}
+                    className="ml-2 underline cursor-pointer hover:text-red-800"
+                  >
+                    {t("report.fields.retry")}
+                  </button>
+                </p>
+              ) : (
+                fieldError("category")
+              )}
             </div>
 
             {/* Description */}
