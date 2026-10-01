@@ -1,10 +1,18 @@
 const nodemailer = require("nodemailer");
 
-// The transporter is only built when Gmail credentials exist, so a missing
-// configuration does not take the whole server down at boot
+// Render times out outbound SMTP connections. Use Gmail API over HTTPS in
+// production and keep SMTP only as a local fallback.
 let transporter = null;
+const gmailApiConfig = [
+  process.env.GMAIL_USE_API === "true",
+  process.env.GMAIL_CLIENT_ID,
+  process.env.GMAIL_CLIENT_SECRET,
+  process.env.GMAIL_REFRESH_TOKEN,
+].every(Boolean);
 
-if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
+if (gmailApiConfig) {
+  console.log("✅ Gmail API email client is ready");
+} else if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
   transporter = nodemailer.createTransport({
     host: "smtp.gmail.com",
     port: 587,
@@ -36,8 +44,37 @@ if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
     );
 } else {
   console.error(
-    "❌ GMAIL_USER or GMAIL_APP_PASSWORD is missing, notification emails will not be sent",
+    "❌ Email configuration is missing: set Gmail API OAuth variables",
   );
+}
+
+const getGmailAccessToken = async () => {
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: process.env.GMAIL_CLIENT_ID,
+      client_secret: process.env.GMAIL_CLIENT_SECRET,
+      refresh_token: process.env.GMAIL_REFRESH_TOKEN,
+      grant_type: "refresh_token",
+    }),
+  });
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      `Gmail OAuth ${response.status}: ${result.error_description || result.error}`,
+    );
+  }
+
+  return result.access_token;
+};
+
+if (gmailApiConfig) {
+  getGmailAccessToken()
+    .then(() => console.log("✅ Gmail API verification passed"))
+    .catch((error) => console.log(`❌ Gmail API verification failed: ${error.message}`));
 }
 
 const BRAND = "Hamro Samadhan";
@@ -46,18 +83,7 @@ const BRAND = "Hamro Samadhan";
 const sendMail = async ({ to, subject, intro, details, message }) => {
   const rows = details.map(([label, value]) => `${label}: ${value}`).join("\n");
 
-  if (!transporter) {
-    throw new Error(
-      "Gmail is not configured, set GMAIL_USER and GMAIL_APP_PASSWORD",
-    );
-  }
-
-  // Plain text only, so every mail client shows it the same way
-  const result = await transporter.sendMail({
-    from: `"${BRAND}" <${process.env.GMAIL_USER}>`,
-    to,
-    subject,
-    text: `
+  const text = `
 Hello,
 
 ${intro}
@@ -70,7 +96,58 @@ ${message}
 Thank you for helping improve our community.
 
 ${BRAND}
-    `,
+    `;
+
+  if (gmailApiConfig) {
+    const accessToken = await getGmailAccessToken();
+    const rawMessage = [
+      `From: Hamro Samadhan <${process.env.GMAIL_USER}>`,
+      `To: ${to}`,
+      `Subject: ${subject}`,
+      "MIME-Version: 1.0",
+      "Content-Type: text/plain; charset=UTF-8",
+      "",
+      text,
+    ].join("\\r\\n");
+
+    const response = await fetch(
+      "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+      {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+        body: JSON.stringify({
+          raw: Buffer.from(rawMessage).toString("base64url"),
+        }),
+      },
+    );
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        `Gmail API ${response.status}: ${result.error?.message || "email rejected"}`,
+      );
+    }
+
+    console.log(`Email accepted by Gmail API: ${result.id} to ${to}`);
+    return;
+  }
+
+  if (!transporter) {
+    throw new Error(
+      "Email is not configured, set Gmail API OAuth variables",
+    );
+  }
+
+  // Local Gmail fallback; Render uses the Gmail API branch above.
+  const result = await transporter.sendMail({
+    from: `"${BRAND}" <${process.env.GMAIL_USER}>`,
+    to,
+    subject,
+    text,
   });
 
   // Log only delivery metadata, never the message contents or credentials.
