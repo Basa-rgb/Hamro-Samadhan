@@ -97,6 +97,7 @@ Loaded from `.env` by `dotenv` in `src/app.js`. Never commit this file.
 | `EMAIL_USER` | No | Gmail address that sends notifications. Without it, every send fails and is swallowed. |
 | `EMAIL_PASSWORD` | No | Gmail **app password** for `EMAIL_USER`, not the account password. |
 | `TRUST_PROXY_HOPS` | No | Number of reverse proxies in front of the app. Needed in production so rate limiting sees real client IPs. |
+| `CLIENT_URL` (multi) | No | `CLIENT_URL` also accepts a **comma separated** list of origins, for when the frontend is reachable on more than one host (Vercel production + preview). |
 | `ADMIN_EMAIL` | No | Only read by `scripts/setStatus.js`. |
 | `ADMIN_PASSWORD` | No | Only read by `scripts/setStatus.js`. |
 
@@ -309,6 +310,18 @@ const res = await fetch("http://localhost:5000/api/auth/login", {
 Cross-site cookies (`SameSite=None`, `Secure`) only apply when
 `NODE_ENV=production`. In development the cookie is `lax` and the CORS origin is
 `http://localhost:5173` — set `CLIENT_URL` to change it (`src/config/cors.js`).
+
+`CLIENT_URL` accepts a comma separated list, which is what a Vercel deploy needs
+because the production and preview hostnames are different:
+
+```dotenv
+CLIENT_URL=https://hamrosamadhan.vercel.app,https://hamro-samadhan-git-main.vercel.app
+```
+
+A request from an origin that is not on the list gets no
+`Access-Control-Allow-Origin` header and is refused at the preflight, so the
+browser blocks it. A request with **no** `Origin` header at all (curl, a server
+side call) is allowed, since there is no cookie to protect.
 
 Because sessions last 15 minutes, any long-lived dashboard will eventually get a
 `401`. The frontend handles that with a global response interceptor that drops
@@ -1321,7 +1334,7 @@ Backend/
     ├── server.js                entry point: connect DB, then listen
     ├── config/
     │   ├── cloudinary.js        Cloudinary credentials
-    │   ├── cors.js              allows CLIENT_URL + credentials
+    │   ├── cors.js              allows CLIENT_URL (list supported) + credentials
     │   └── db.js                mongoose connection
     ├── constants/
     │   └── categories.js        the 10 categories, single source of truth
@@ -1358,7 +1371,7 @@ reach the `500` handler.
 
 1. `app.set("trust proxy", TRUST_PROXY_HOPS)` — correct client IPs behind a proxy
 2. `helmet()` — security headers
-3. `cors` — only `CLIENT_URL`, credentials allowed
+3. `cors` — only the origins in `CLIENT_URL`, credentials allowed
 4. `express.json` / `express.urlencoded` — 100 KB body cap
 5. `cookieParser`
 6. `apiLimiter` on `/api` — 300 requests / 15 min
@@ -1379,11 +1392,33 @@ listening immediately, so the port is open for a moment before Mongo is ready.
 
 ## Frontend integration notes
 
-The Vite app in `../Frontend` expects `VITE_API_URL=http://localhost:3000/api`, so
-either run the backend on `PORT=3000` or point the frontend at `5000`. Its axios
-instance sets `withCredentials: true`, which is required for the session cookie,
-and registers one interceptor that redirects to the admin login on any `401`
-except from `/auth/login` and `/auth/logout`.
+The Vite app in `../Frontend` reads `VITE_API_URL` (see `.env.example`), so either
+run the backend on `PORT=3000` or point the frontend at `5000`. Its axios instance
+sets `withCredentials: true`, which is required for the session cookie, and
+registers one interceptor that redirects to the admin login on any `401` except
+from `/auth/login` and `/auth/logout`.
+
+### Deploying the frontend to Vercel
+
+Set the root directory to `Frontend`. Two things are needed and both are easy to
+miss:
+
+| Where | What | Why |
+| --- | --- | --- |
+| Vercel → Settings → Environment Variables | `VITE_API_URL` = your deployed API base URL, ending in `/api`. Add it for **Production, Preview and Development**. | Vite inlines `import.meta.env` at **build** time. Saving the variable does nothing on its own, you must redeploy. Without it the bundle is built with `baseURL: undefined` and every request goes to the Vercel origin, which looks like a dead backend rather than a missing variable — the app now logs a warning in the console when it is unset. |
+| `Frontend/vercel.json` | SPA rewrite to `index.html` (already committed) | Without it Vercel serves its own 404 for `/admin/login` on a direct visit or refresh. Client side navigation works, a hard reload does not. |
+
+The backend needs `NODE_ENV=production` and `CLIENT_URL` set to the frontend's
+domain, or the session cookie is not marked `Secure`/`SameSite=None` and the
+browser discards it — the admin would log in successfully and stay signed out.
+
+Both halves are separate deployments, so the frontend must be reachable over
+**HTTPS** for the cross-site cookie to be accepted at all.
+
+**Order to verify a deploy:** open `/admin/login` directly (proves the rewrite),
+log in (proves the cookie), then load `/report` and open the category dropdown
+(proves `GET /api/categories` reaches the API). The category dropdown is the
+quickest check that `VITE_API_URL` resolved correctly.
 
 Tracking works as the Track page calls it — by ID alone, with the citizen's
 details redacted. The page guards every optional field with `?.` / `||`, so a

@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+# Local env only, the tracked template is .env.example. VITE_API_URL is baked
+# into the bundle at build time, so the Vercel value comes from the dashboard
+.env
+.env.*
+!.env.example
+.vercel
