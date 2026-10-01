@@ -5,6 +5,16 @@ const cors = require("cors");
 const allowedOrigin =
   process.env.CLIENT_URL || "http://localhost:5173";
 
+// A browser sends the Origin header with no trailing slash, so a CLIENT_URL that
+// ends in one can never match and every browser request gets refused, login
+// included. Dropping the slash here means a copy pasted straight from a browser's
+// address bar still works
+const normalise = (value) =>
+  value
+    .trim()
+    .replace(/\/+$/, "")
+    .toLowerCase();
+
 // A production deploy with no CLIENT_URL answers every browser request without
 // an allow header, so the frontend gets blocked and the pages that depend on
 // the API render empty, a dead dropdown rather than a CORS error. The requests
@@ -27,7 +37,7 @@ if (process.env.NODE_ENV === "production" && !process.env.CLIENT_URL) {
 // of them matching is enough.
 const allowedOrigins = allowedOrigin
   .split(",")
-  .map((origin) => origin.trim())
+  .map(normalise)
   .filter(Boolean);
 
 const corsOptions = {
@@ -36,7 +46,8 @@ const corsOptions = {
     // no cookie to steal and nothing for CORS to protect
     if (!origin) return callback(null, true);
 
-    if (allowedOrigins.includes(origin)) return callback(null, true);
+    if (allowedOrigins.includes(normalise(origin)))
+      return callback(null, true);
 
     // false rather than an error, so the response goes out without the
     // allow header and the browser blocks it. The preflight is refused the same

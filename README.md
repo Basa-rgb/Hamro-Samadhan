@@ -89,7 +89,7 @@ Loaded from `.env` by `dotenv` in `src/app.js`. Never commit this file.
 | --- | --- | --- |
 | `MONGOOSE_URL` | **Yes** | MongoDB connection string. The app `process.exit(1)`s without it. |
 | `PORT` | No | Port to listen on. Defaults to `5000`. |
-| `NODE_ENV` | No | `production` sets `secure` + `sameSite=none` on the session cookie. |
+| `NODE_ENV` | No | Informational only. The session cookie's `Secure`/`SameSite` follow the protocol the request arrived on, not this value. |
 | `CLIENT_URL` | **Yes** in production | Browser origin allowed by CORS. Defaults to `http://localhost:5173`, which blocks a deployed frontend entirely. The server logs a warning on boot in production without it. |
 | `CLOUDINARY_CLOUD_NAME` | **Yes** | Cloudinary account name, for report photos. |
 | `CLOUDINARY_API_KEY` | **Yes** | Cloudinary API key. |
@@ -250,7 +250,7 @@ hash. `POST /api/auth/logout` deletes the row, which genuinely ends the session.
 | Stored as | SHA-256 hash — a database leak cannot be replayed as a login |
 | Lifetime | 15 minutes |
 | Expiry | A Mongo TTL index on `expiresAt` deletes the row, so dead sessions never pile up |
-| Cookie | `HttpOnly`, `Path=/`, `Max-Age=900`, `SameSite=Lax` in dev and `None` + `Secure` in production |
+| Cookie | `HttpOnly`, `Path=/`, `Max-Age=900`. `SameSite=Lax` over http, `None` + `Secure` over https |
 | Same secret again | `Bearer` header also accepted, for non-browser clients |
 
 `authMiddleware` (`src/middleware/auth.js`) takes the token from either place:
@@ -307,12 +307,20 @@ const res = await fetch("http://localhost:5000/api/auth/login", {
 });
 ```
 
-Cross-site cookies (`SameSite=None`, `Secure`) only apply when
-`NODE_ENV=production`. In development the cookie is `lax` and the CORS origin is
-`http://localhost:5173` — set `CLIENT_URL` to change it (`src/config/cors.js`).
+The cookie's `Secure` and `SameSite` are derived from the request that logged in,
+not from `NODE_ENV`: an https request (directly, or as `X-Forwarded-Proto` from
+Render's proxy) gets `SameSite=None; Secure`, an http request gets `SameSite=Lax`.
 
-`CLIENT_URL` accepts a comma separated list, which is what a Vercel deploy needs
-because the production and preview hostnames are different:
+This matters because a `Secure` cookie set over plain http is accepted by the
+browser and then silently discarded. Login returns `200`, the dashboard loads,
+and every subsequent admin call arrives with no `Cookie` header and gets a `401`.
+That is the failure mode to look for if admin auth appears to work on one machine
+and not another.
+
+Set `CLIENT_URL` to the browser origin to change what CORS allows
+(`src/config/cors.js`). It accepts a comma separated list, which is what a Vercel
+deploy needs because the production and preview hostnames are different, and
+trailing slashes are stripped so a URL pasted from the address bar still matches:
 
 ```dotenv
 CLIENT_URL=https://hamrosamadhan.vercel.app,https://hamro-samadhan-git-main.vercel.app
@@ -1442,9 +1450,12 @@ miss:
 | Vercel → Settings → Environment Variables | `VITE_API_URL` = your deployed API base URL, ending in `/api`. Add it for **Production, Preview and Development**. | Vite inlines `import.meta.env` at **build** time. Saving the variable does nothing on its own, you must redeploy. Without it the bundle is built with `baseURL: undefined` and every request goes to the Vercel origin, which looks like a dead backend rather than a missing variable — the app now logs a warning in the console when it is unset. |
 | `Frontend/vercel.json` | SPA rewrite to `index.html` (already committed) | Without it Vercel serves its own 404 for `/admin/login` on a direct visit or refresh. Client side navigation works, a hard reload does not. |
 
-The backend needs `NODE_ENV=production` and `CLIENT_URL` set to the frontend's
-domain, or the session cookie is not marked `Secure`/`SameSite=None` and the
-browser discards it — the admin would log in successfully and stay signed out.
+`CLIENT_URL` must be set to the frontend's domain, without a trailing slash.
+A miss means the browser blocks the response and the session cookie never
+arrives — the admin would log in successfully and stay signed out. The cookie
+attributes need no configuration: Render terminates TLS, so the proxy forwards
+`X-Forwarded-Proto: https` and the cookie is set `Secure; SameSite=None` on its
+own.
 
 Both halves are separate deployments, so the frontend must be reachable over
 **HTTPS** for the cross-site cookie to be accepted at all.
