@@ -11,6 +11,10 @@ if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
       user: process.env.GMAIL_USER,
       pass: process.env.GMAIL_APP_PASSWORD,
     },
+    // Do not let a slow SMTP connection keep a report submission pending.
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
   });
   console.log("✅ Gmail email client is ready");
 } else {

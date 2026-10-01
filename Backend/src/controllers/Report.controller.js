@@ -103,20 +103,20 @@ const createReport = async (req, res) => {
       photo,
     });
 
-    // The confirmation mail is best effort, so a mail failure never loses the report
-    try {
-      await sendReportSubmitted({
-        email: report.reporter.email,
-        reportId: report.reportId,
-        title: report.title,
-        // The label, not the stored value, so the citizen reads "Road Damage"
-        // rather than road_damage in their confirmation mail
-        category: categoryDoc.label,
-        location: report.location.address,
-      });
-    } catch (notificationError) {
+    // Email is best effort and must not make the citizen wait for Gmail.
+    // The report is already safely stored, so delivery continues after the API
+    // response and any failure is logged for the server operator.
+    sendReportSubmitted({
+      email: report.reporter.email,
+      reportId: report.reportId,
+      title: report.title,
+      // The label, not the stored value, so the citizen reads "Road Damage"
+      // rather than road_damage in their confirmation mail
+      category: categoryDoc.label,
+      location: report.location.address,
+    }).catch((notificationError) => {
       console.log(`Notification error: ${notificationError.message}`);
-    }
+    });
 
     return res.status(201).json({
       success: true,
