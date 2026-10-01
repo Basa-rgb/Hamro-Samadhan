@@ -46,9 +46,3 @@ export const getReportById = async (reportId, token) => {
 
     return response.data
 }
-
-export const getCategories = async()=>{
-    const response = await api.get("/categories");
-
-    return response.data
-}
