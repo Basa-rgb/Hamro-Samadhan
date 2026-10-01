@@ -66,6 +66,8 @@
       "titlePlaceholder": "e.g. Large pothole on main road",
       "category": "Category",
       "categoryPlaceholder": "Select a category",
+      "categoryUnavailable": "Categories unavailable",
+      "retry": "Retry",
       "description": "Description",
       "descriptionPlaceholder": "Describe the problem in detail...",
       "charLimit": "Maximum 2000 characters",

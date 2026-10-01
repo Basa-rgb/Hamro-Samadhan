@@ -5,6 +5,19 @@ const cors = require("cors");
 const allowedOrigin =
   process.env.CLIENT_URL || "http://localhost:5173";
 
+// A production deploy with no CLIENT_URL answers every browser request without
+// an allow header, so the frontend gets blocked and the pages that depend on
+// the API render empty, a dead dropdown rather than a CORS error. The requests
+// still work from curl, which is what makes this easy to miss, so say so on
+// boot where it is actually visible
+if (process.env.NODE_ENV === "production" && !process.env.CLIENT_URL) {
+  console.warn(
+    "[cors] CLIENT_URL is not set, so only http://localhost:5173 is allowed " +
+      "and the deployed frontend cannot reach the API. Set CLIENT_URL in the " +
+      "host dashboard, then redeploy.",
+  );
+}
+
 // Requests from anywhere else are rejected by the browser.
 // credentials is required, otherwise the session cookie is never sent.
 //

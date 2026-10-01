@@ -66,6 +66,8 @@
       "titlePlaceholder": "जस्तै: मुख्य सडकमा ठूलो खाल्डो",
       "category": "श्रेणी",
       "categoryPlaceholder": "श्रेणी चयन गर्नुहोस्",
+      "categoryUnavailable": "श्रेणीहरू उपलब्ध छैनन्",
+      "retry": "पुनः प्रयास",
       "description": "विवरण",
       "descriptionPlaceholder": "समस्याको विस्तृत विवरण दिनुहोस्...",
       "charLimit": "अधिकतम २००० अक्षर",
