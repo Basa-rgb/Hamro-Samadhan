@@ -103,6 +103,12 @@ const createReport = async (req, res) => {
       photo,
     });
 
+    console.log(
+      `Report created: ${report.reportId}; notification recipient present: ${Boolean(
+        report.reporter?.email,
+      )}`,
+    );
+
     // Email is best effort and must not make the citizen wait for Gmail.
     // The report is already safely stored, so delivery continues after the API
     // response and any failure is logged for the server operator.
