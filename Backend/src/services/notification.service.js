@@ -1,14 +1,23 @@
 const nodemailer = require("nodemailer");
 
-// Reused for every mail so connections are pooled
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASSWORD,
   },
+  connectionTimeout: 10000,
+  greetingTimeout: 10000,
+  socketTimeout: 10000,
 });
 
+transporter.verify((error, success) => {
+  if (error) {
+    console.error("❌ Gmail SMTP connection failed:", error);
+  } else {
+    console.log("✅ Gmail SMTP connection is ready");
+  }
+});
 const BRAND = "Hamro Samadhan";
 
 // Every mail shares one sender and one layout, so a new kind only supplies text
