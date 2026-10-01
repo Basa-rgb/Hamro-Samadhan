@@ -9,7 +9,7 @@ at every change, and follows progress through a tracking link.
 - **Database:** MongoDB via Mongoose 9
 - **Auth:** opaque server-side session tokens, SHA-256 hashed, stored in Mongo
 - **Images:** Cloudinary
-- **Email:** Nodemailer / Gmail
+- **Email:** Resend
 - **Validation:** Joi
 - **Security:** helmet, cors, express-rate-limit, bcrypt
 
@@ -94,8 +94,8 @@ Loaded from `.env` by `dotenv` in `src/app.js`. Never commit this file.
 | `CLOUDINARY_CLOUD_NAME` | **Yes** | Cloudinary account name, for report photos. |
 | `CLOUDINARY_API_KEY` | **Yes** | Cloudinary API key. |
 | `CLOUDINARY_API_SECRET` | **Yes** | Cloudinary API secret. |
-| `EMAIL_USER` | No | Gmail address that sends notifications. Without it, every send fails and is swallowed. |
-| `EMAIL_PASSWORD` | No | Gmail **app password** for `EMAIL_USER`, not the account password. |
+| `RESEND_API_KEY` | No | Resend API key used to send notifications. Without it, every send fails and is swallowed. |
+| `EMAIL_FROM` | No | Verified sender address on the Resend domain. Defaults to `onboarding@resend.dev`, which can only send to your own account address. |
 | `TRUST_PROXY_HOPS` | No | Number of reverse proxies in front of the app. Needed in production so rate limiting sees real client IPs. |
 | `CLIENT_URL` (multi) | No | `CLIENT_URL` also accepts a **comma separated** list of origins, for when the frontend is reachable on more than one host (Vercel production + preview). |
 | `ADMIN_EMAIL` | No | Only read by `scripts/setStatus.js`. |
@@ -113,8 +113,8 @@ CLOUDINARY_CLOUD_NAME=
 CLOUDINARY_API_KEY=
 CLOUDINARY_API_SECRET=
 
-EMAIL_USER=
-EMAIL_PASSWORD=
+RESEND_API_KEY=
+EMAIL_FROM=onboarding@resend.dev
 
 TRUST_PROXY_HOPS=0
 ```
@@ -1247,7 +1247,7 @@ accepts active departments).
 
 ## Email notifications
 
-Every mail is plain text from one pooled Gmail transporter, and all four share
+Every mail is plain text sent through one Resend client, and all four share
 one layout, so a new kind only supplies the text
 (`src/services/notification.service.js`).
 
@@ -1264,9 +1264,14 @@ a per-status sentence so the mail still reads correctly when the admin leaves th
 message blank.
 
 **Email is always best effort.** Every call is wrapped in its own `try/catch` and
-a failure is logged as `Notification error: ...` and swallowed, so a broken SMTP
-config can never lose a report or roll back a status change. Gmail requires an
-**app password**, not the account password, and the account must have 2FA on.
+a failure is logged as `Notification error: ...` and swallowed, so a broken
+Resend config can never lose a report or roll back a status change. Resend
+returns failures in the response instead of throwing, so the service re-throws
+them for those log lines to catch.
+
+The sender domain must be verified on the Resend account before real
+recipients can be mailed. Until then `onboarding@resend.dev` works, but only
+delivers to the address that owns the API key.
 
 ---
 
