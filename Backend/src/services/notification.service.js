@@ -1,15 +1,21 @@
-const { Resend } = require("resend");
+const nodemailer = require("nodemailer");
 
-// The client is only built when a key exists, since the constructor throws,
-// and a missing key must not take the whole server down at boot
-let resend = null;
+// The transporter is only built when Gmail credentials exist, so a missing
+// configuration does not take the whole server down at boot
+let transporter = null;
 
-if (process.env.RESEND_API_KEY) {
-  resend = new Resend(process.env.RESEND_API_KEY);
-  console.log("✅ Resend email client is ready");
+if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
+  transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: process.env.GMAIL_USER,
+      pass: process.env.GMAIL_APP_PASSWORD,
+    },
+  });
+  console.log("✅ Gmail email client is ready");
 } else {
   console.error(
-    "❌ RESEND_API_KEY is missing, notification emails will not be sent",
+    "❌ GMAIL_USER or GMAIL_APP_PASSWORD is missing, notification emails will not be sent",
   );
 }
 
@@ -19,13 +25,15 @@ const BRAND = "Hamro Samadhan";
 const sendMail = async ({ to, subject, intro, details, message }) => {
   const rows = details.map(([label, value]) => `${label}: ${value}`).join("\n");
 
-  if (!resend) {
-    throw new Error("Resend is not configured, set RESEND_API_KEY");
+  if (!transporter) {
+    throw new Error(
+      "Gmail is not configured, set GMAIL_USER and GMAIL_APP_PASSWORD",
+    );
   }
 
   // Plain text only, so every mail client shows it the same way
-  const { error } = await resend.emails.send({
-    from: `"${BRAND}" <${process.env.EMAIL_FROM || "onboarding@resend.dev"}>`,
+  await transporter.sendMail({
+    from: `"${BRAND}" <${process.env.GMAIL_USER}>`,
     to,
     subject,
     text: `
@@ -43,12 +51,6 @@ Thank you for helping improve our community.
 ${BRAND}
     `,
   });
-
-  // Resend reports failures in the response instead of throwing,
-  // so raise it here and let the callers log it as before
-  if (error) {
-    throw new Error(error.message);
-  }
 };
 
 // Status, priority and department mails all report the same snapshot
