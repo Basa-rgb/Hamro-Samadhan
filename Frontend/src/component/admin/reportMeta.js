@@ -6,10 +6,10 @@
 //
 // The values match the enums in the Joi validation on the backend, so nothing
 // here can be sent that the server will reject.
-// The categories a citizen can file under are shared with the public report
-// form, so the admin screens and the form cannot disagree about the list
-import { CATEGORY_LABEL } from "../../constants/categories";
-
+//
+// Categories are NOT listed here. They live in the database and are read through
+// useCategories, so an admin who adds one in the portal sees it in the dropdown
+// and on every row without a code change
 export const STATUS_OPTIONS = [
   { value: "PENDING", label: "Pending" },
   { value: "UNDER_REVIEW", label: "Under review" },
@@ -66,11 +66,9 @@ const toLabelMap = (options) =>
 
 export const STATUS_LABEL = toLabelMap(STATUS_OPTIONS);
 export const PRIORITY_LABEL = toLabelMap(PRIORITY_OPTIONS);
-export { CATEGORY_LABEL };
 
 export const getStatusLabel = (value) => STATUS_LABEL[value] || value;
 export const getPriorityLabel = (value) => PRIORITY_LABEL[value] || value;
-export const getCategoryLabel = (value) => CATEGORY_LABEL[value] || value;
 
 // The dropdowns need an empty option, the backend treats "" as no filter
 export const FILTER_OPTIONS = [{ value: "", label: "All" }, ...STATUS_OPTIONS];

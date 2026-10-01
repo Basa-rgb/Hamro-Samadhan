@@ -15,6 +15,7 @@ import { useTranslation } from "react-i18next";
 import NepaliDate from "nepali-date-converter";
 import { getReportById, getReportToken } from "../../services/ReportService";
 import { useClipboard } from "../Hooks/useClipboard";
+import useCategoryLabel from "../Hooks/useCategoryLabel";
 
 // The API stores statuses in SCREAMING_SNAKE, these pick the colour of each
 // one so the badge and the timeline dot always agree with each other
@@ -61,6 +62,10 @@ const CLOSED_STATUSES = ["RESOLVED", "REJECTED"];
 const TrackReport = () => {
   const { t, i18n } = useTranslation();
   const { copied, copy } = useClipboard();
+  // A report stores its category as the value, so the readable name is resolved
+  // here. Reads the i18n keys first and falls back to the API, which is what lets
+  // an admin add a category without a translation file
+  const getCategoryLabel = useCategoryLabel();
 
   const [reportId, setReportId] = useState("");
   const [report, setReport] = useState(null);
@@ -482,9 +487,7 @@ const TrackReport = () => {
                             </p>
 
                             <span className="inline-block mt-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-md text-xs font-semibold">
-                              {t(`report.categories.${report.category}`, {
-                                defaultValue: report.category,
-                              })}
+                              {getCategoryLabel(report.category)}
                             </span>
                           </div>
 

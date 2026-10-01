@@ -29,12 +29,11 @@ import {
 } from "../../component/admin/ui";
 import Toast from "../../component/admin/Toast";
 import ReportDetailPanel from "../../component/admin/ReportDetailPanel";
-import {
-    STATUS_OPTIONS,
-    PRIORITY_OPTIONS,
-    getCategoryLabel,
-} from "../../component/admin/reportMeta";
+import { STATUS_OPTIONS, PRIORITY_OPTIONS } from "../../component/admin/reportMeta";
 import { useToast } from "../../Hooks/useToast";
+import { useAuth } from "../../Hooks/useAuth";
+import useCategories from "../../Hooks/useCategories";
+import useCategoryLabel from "../../Hooks/useCategoryLabel";
 
 const PAGE_SIZE = 20;
 
@@ -60,10 +59,20 @@ const buildPageList = (current, total) => {
 const AdminReports = () => {
     const [ searchParams, setSearchParams ] = useSearchParams();
 
+    // Which role is signed in decides what this screen offers. The server enforces
+    // the same rules, so hiding a control is a courtesy and not the permission
+    const { isAdmin, isDepartmentAdmin, departmentName, user } = useAuth();
+
+    // The complaint types come from the same API the public form uses
+    const { categories } = useCategories();
+    const getCategoryLabel = useCategoryLabel();
+
     // The filters live in the URL, so a link from the dashboard, or a shared
     // link from a colleague, opens on exactly the same view
     const status = searchParams.get("status") || "";
     const priority = searchParams.get("priority") || "";
+    const category = searchParams.get("category") || "";
+    const department = searchParams.get("department") || "";
     const page = Number(searchParams.get("page")) || 1;
     const detailId = searchParams.get("report");
 
@@ -131,6 +140,8 @@ const AdminReports = () => {
                     limit: PAGE_SIZE,
                     status: status || undefined,
                     priority: priority || undefined,
+                    category: category || undefined,
+                    department: isAdmin ? department || undefined : undefined,
                     search: search || undefined,
                 });
 
@@ -157,7 +168,7 @@ const AdminReports = () => {
         return () => {
             active = false;
         };
-    }, [page, status, priority, search, reloadToken]);
+    }, [page, status, priority, category, department, search, reloadToken, isAdmin]);
 
     // The manual refresh bumps the token, which re-runs the effect above
     const loadReports = () => {
@@ -165,21 +176,39 @@ const AdminReports = () => {
         setReloadToken((token) => token + 1);
     };
 
-    // The department list is only needed for the assignment dropdowns
+    // The department list is only needed for the assignment dropdowns, and only a
+    // full admin can read it. A department admin already has their own department
+    // on the session, so they need no second request
     useEffect(() => {
+        if (!isAdmin) {
+            setDepartments(
+                user?.department ? [user.department] : [],
+            );
+
+            return;
+        }
+
+        let active = true;
+
         const loadDepartments = async () => {
             try {
                 const response = await getDepartments();
 
+                if (!active) return;
+
                 setDepartments(response.departments);
             } catch {
                 // Assignment still works from the list, it just cannot be picked
-                setDepartments([]);
+                if (active) setDepartments([]);
             }
         };
 
         loadDepartments();
-    }, []);
+
+        return () => {
+            active = false;
+        };
+    }, [isAdmin, user]);
 
     // 400ms after the last keystroke, so typing a report id costs one request
     useEffect(() => {
@@ -192,13 +221,55 @@ const AdminReports = () => {
         return () => clearTimeout(timer);
     }, [searchInput, search, updateParams]);
 
-    const activeFilterCount = [status, priority, search].filter(Boolean).length;
+    const activeFilterCount = [status, priority, category, department, search].filter(
+        Boolean,
+    ).length;
 
     const clearFilters = () => {
         setSearchInput("");
         setLoading(true);
         setSearchParams({}, { replace: true });
     };
+
+    // The departments this row's dropdown offers.
+    //
+    // For a full admin that is every active department, plus whichever one is
+    // already assigned even if it has since been retired, so an existing
+    // assignment never becomes impossible to display.
+    //
+    // For a department admin it is exactly their own department and nothing else.
+    // The server refuses anything else, so a dropdown full of options that would
+    // 403 is worse than one that only states what is true.
+    //
+    // Departments that list this report's category are floated to the top. It is
+    // only a suggestion, which is why the server reports a mismatch as a warning
+    // instead of refusing the assignment.
+    const assignmentOptions = (report) => {
+        const assignedId = report.assignedDepartment?._id;
+
+        return departments
+            .filter(
+                (item) => item.isActive !== false || item._id === assignedId,
+            )
+            .sort((a, b) => {
+                const aHandles = a.categories?.includes(report.category) ? 1 : 0;
+                const bHandles = b.categories?.includes(report.category) ? 1 : 0;
+
+                return bHandles - aHandles;
+            });
+    };
+
+    // A department admin cannot open the department management screen, so their
+    // own name is the only one that appears in the dropdown
+    const handleNames = useMemo(() => {
+        const map = {};
+
+        departments.forEach((item) => {
+            map[item._id] = item.name;
+        });
+
+        return map;
+    }, [departments]);
 
     const formatDateTime = (value) => {
         if (!value) return "";
@@ -290,9 +361,17 @@ const AdminReports = () => {
         });
 
         try {
-            await assignDepartment(report._id, departmentId);
+            const response = await assignDepartment(report._id, departmentId);
 
-            showToast("success", `${report.reportId} assigned to ${chosenName}.`);
+            // The server allows an assignment that does not match the department's
+            // category list and says so here. Surfacing it keeps the mismatch
+            // visible instead of leaving a report quietly sitting with a department
+            // that does not handle it
+            if (response.warning) {
+                showToast("error", response.warning);
+            } else {
+                showToast("success", `${report.reportId} assigned to ${chosenName}.`);
+            }
         } catch (error) {
             patchRow(report._id, { assignedDepartment: previous });
 
@@ -331,6 +410,19 @@ const AdminReports = () => {
                     </button>
                 }
             />
+
+            {/* Says out loud what a department admin is looking at, so an empty list
+                reads as "nothing in your queue" rather than "something is broken".
+                The server narrows the query, this just names the queue */}
+            {isDepartmentAdmin && (
+                <div className="mb-4 bg-blue-50 border border-blue-200 rounded-2xl px-4 py-3">
+                    <p className="text-sm text-blue-800">
+                        Showing reports in{" "}
+                        <span className="font-bold">{departmentName}</span> only.
+                        Routing and department settings are handled by a full admin.
+                    </p>
+                </div>
+            )}
 
             {/* ==================== FILTERS ==================== */}
             <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-4">
@@ -398,6 +490,65 @@ const AdminReports = () => {
                             ))}
                         </select>
                     </div>
+
+                    {/* Built from the API, so a complaint type an admin adds in the
+                        portal turns up here without a code change */}
+                    <div>
+                        <label htmlFor="category" className={LABEL_CLASS}>
+                            Category
+                        </label>
+
+                        <select
+                            id="category"
+                            value={category}
+                            onChange={(e) =>
+                                updateParams({ category: e.target.value })
+                            }
+                            className={FIELD_CLASS}
+                        >
+                            <option value="">All categories</option>
+
+                            {categories.map((item) => (
+                                <option key={item.value} value={item.value}>
+                                    {getCategoryLabel(item.value)}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Routing is a full admin's decision, so the filter for it is
+                        too. A department admin sees their own work either way */}
+                    {isAdmin && (
+                        <div>
+                            <label htmlFor="department" className={LABEL_CLASS}>
+                                Department
+                            </label>
+
+                            <select
+                                id="department"
+                                value={department}
+                                onChange={(e) =>
+                                    updateParams({ department: e.target.value })
+                                }
+                                className={FIELD_CLASS}
+                            >
+                                <option value="">All departments</option>
+
+                                {/* The unassigned queue is where an admin starts,
+                                    so it is a first class filter rather than a
+                                    missing value */}
+                                <option value="none">Unassigned</option>
+
+                                {departments
+                                    .filter((item) => item.isActive !== false)
+                                    .map((item) => (
+                                        <option key={item._id} value={item._id}>
+                                            {item.name}
+                                        </option>
+                                    ))}
+                            </select>
+                        </div>
+                    )}
                 </div>
 
                 {activeFilterCount > 0 && (
@@ -540,49 +691,76 @@ const AdminReports = () => {
                                             </td>
 
                                             <td className="px-4 py-3.5">
-                                                <select
-                                                    value={
-                                                        report.assignedDepartment?._id || ""
-                                                    }
-                                                    disabled={isBusy}
-                                                    onChange={(e) =>
-                                                        handleDepartmentChange(
-                                                            report,
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    aria-label={`Department for ${report.reportId}`}
-                                                    className="text-xs font-semibold px-2.5 py-1.5 border border-gray-200 rounded-lg bg-white outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 disabled:opacity-60 cursor-pointer max-w-44"
-                                                >
-                                                    {/* Placeholder only. There is no
-                                                        unassign endpoint, so it must
-                                                        not look selectable */}
-                                                    <option value="" disabled>
-                                                        Unassigned
-                                                    </option>
+                                                {(() => {
+                                                    const options =
+                                                        assignmentOptions(report);
 
-                                                    {departments
-                                                        // Retired departments keep
-                                                        // their old reports, so an
-                                                        // existing assignment has
-                                                        // to stay selectable
-                                                        .filter(
-                                                            (department) =>
-                                                                department.isActive ||
-                                                                department._id ===
-                                                                    report
-                                                                        .assignedDepartment
-                                                                        ?._id,
-                                                        )
-                                                        .map((department) => (
-                                                            <option
-                                                                key={department._id}
-                                                                value={department._id}
-                                                            >
-                                                                {department.name}
+                                                    const assignedId =
+                                                        report.assignedDepartment
+                                                            ?._id;
+
+                                                    /* A department admin can only ever
+                                                       confirm their own department, so
+                                                       with a single option there is
+                                                       nothing to choose. A plain badge
+                                                       says that better than a
+                                                       one-item dropdown */
+                                                    if (isDepartmentAdmin) {
+                                                        return (
+                                                            <div>
+                                                                <span className="inline-block px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 text-gray-600">
+                                                                    {assignedId
+                                                                        ? handleNames[
+                                                                                  assignedId
+                                                                              ] ||
+                                                                          report
+                                                                              .assignedDepartment
+                                                                              ?.name ||
+                                                                          "Assigned"
+                                                                        : "Unassigned"}
+                                                                </span>
+                                                            </div>
+                                                        );
+                                                    }
+
+                                                    return (
+                                                        <select
+                                                            value={assignedId || ""}
+                                                            disabled={isBusy}
+                                                            onChange={(e) =>
+                                                                handleDepartmentChange(
+                                                                    report,
+                                                                    e
+                                                                        .target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            aria-label={`Department for ${report.reportId}`}
+                                                            className="text-xs font-semibold px-2.5 py-1.5 border border-gray-200 rounded-lg bg-white outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 disabled:opacity-60 cursor-pointer max-w-44"
+                                                        >
+                                                            {/* Placeholder only. There is
+                                                                no unassign endpoint, so it
+                                                                must not look selectable */}
+                                                            <option value="" disabled>
+                                                                Unassigned
                                                             </option>
-                                                        ))}
-                                                </select>
+
+                                                            {options.map((item) => (
+                                                                <option
+                                                                    key={item._id}
+                                                                    value={item._id}
+                                                                >
+                                                                    {item.name}
+                                                                    {item.categories?.includes(
+                                                                        report.category,
+                                                                    )
+                                                                        ? " ★"
+                                                                        : ""}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    );
+                                                })()}
                                             </td>
 
                                             <td className="px-4 py-3.5 text-xs text-gray-600 whitespace-nowrap">

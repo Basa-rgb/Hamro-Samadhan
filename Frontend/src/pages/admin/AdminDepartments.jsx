@@ -6,6 +6,7 @@ import {
     X,
     Power,
     Loader2,
+    Tags,
 } from "lucide-react";
 import {
     getDepartments,
@@ -24,8 +25,9 @@ import {
 } from "../../component/admin/ui";
 import Toast from "../../component/admin/Toast";
 import { useToast } from "../../Hooks/useToast";
+import useCategories from "../../Hooks/useCategories";
 
-const emptyForm = { name: "", description: "" };
+const emptyForm = { name: "", description: "", categories: [] };
 
 const AdminDepartments = () => {
     const [ departments, setDepartments ] = useState([]);
@@ -33,17 +35,52 @@ const AdminDepartments = () => {
     const [ errorMsg, setErrorMsg ] = useState("");
     const [ reloadToken, setReloadToken ] = useState(0);
 
+    // The complaint types a department can be given. Read from the API, so a type
+    // an admin added on the Categories screen is assignable here immediately
+    const { categories, loading: categoriesLoading } = useCategories();
+
     // Creating always uses the inline form at the top of the page
     const [ form, setForm ] = useState(emptyForm);
     const [ creating, setCreating ] = useState(false);
     const [ createError, setCreateError ] = useState("");
 
     // Editing uses a dialog, because renaming or retiring deserves a confirmation
-    const [ editing, setEditing] = useState(null);
+    const [ editing, setEditing ] = useState(null);
     const [ saving, setSaving ] = useState(false);
     const [ editError, setEditError ] = useState("");
 
     const { toast, showToast, clearToast } = useToast();
+
+    // Adds or removes a value from a category list and returns the new list.
+// A pure function rather than one that sets state, because the create form and the
+// edit dialog each hold their own copy in a differently shaped object and both
+// need the same behaviour
+const toggleValue = (list, value) =>
+    list.includes(value)
+        ? list.filter((item) => item !== value)
+        : [...list, value];
+
+    // The chips a department owns, plus how many of the complaint types exist in
+    // total. Shown on the row so an admin can see at a glance which department has
+    // nothing to work on without opening the dialog
+    const categoryChips = (department) => {
+        if (!department.categories?.length) {
+            return (
+                <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-0.5">
+                    No categories
+                </span>
+            );
+        }
+
+        return department.categories.map((value) => (
+            <span
+                key={value}
+                className="text-xs text-blue-800 bg-blue-50 border border-blue-200 rounded px-2 py-0.5"
+            >
+                {categories.find((item) => item.value === value)?.label || value}
+            </span>
+        ));
+    };
 
     // The reload token lets a create or an edit refresh the list by re-running the
     // effect, instead of repeating the fetch inline
@@ -101,7 +138,7 @@ const AdminDepartments = () => {
         setCreating(true);
 
         try {
-            await createDepartment(form.name.trim(), form.description.trim());
+            await createDepartment(form.name.trim(), form.description.trim(), form.categories);
 
             setForm(emptyForm);
             showToast("success", "Department created.");
@@ -122,10 +159,13 @@ const AdminDepartments = () => {
         setSaving(true);
 
         try {
-            // Only what changed is sent, the controller leaves the rest as it is
+            // Only what changed is sent, the controller leaves the rest as it is.
+            // categories always goes, because unchecking every box is a real
+            // instruction and an absent field would be treated as "no change"
             await updateDepartment(editing._id, {
                 name: editing.name.trim(),
                 description: editing.description.trim(),
+                categories: editing.categories || [],
                 isActive: editing.isActive,
             });
 
@@ -241,7 +281,7 @@ const AdminDepartments = () => {
 
                     <button
                         type="submit"
-                        disabled={creating}
+                        disabled={creating || categoriesLoading}
                         className={`${PRIMARY_BUTTON_CLASS} lg:mt-[26px]`}
                     >
                         {creating ? (
@@ -256,6 +296,60 @@ const AdminDepartments = () => {
                             </>
                         )}
                     </button>
+                </div>
+
+                {/* ==================== CATEGORIES ==================== */}
+                {/* The complaint types this department owns. This list is the whole
+                    visible world of the department's own admin, so getting it
+                    wrong here is what makes their portal look empty later */}
+                <div className="mt-4">
+                    <div className="flex items-center gap-2">
+                        <Tags size={15} className="text-blue-700" />
+
+                        <span className={LABEL_CLASS.replace("mb-1.5", "mb-0")}>
+                            Categories handled
+                        </span>
+
+                        <span className="text-xs text-gray-400">
+                            {form.categories.length} of {categories.length} selected
+                        </span>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 mt-2">
+                        {categoriesLoading ? (
+                            <span className="text-xs text-gray-500">
+                                Loading categories...
+                            </span>
+                        ) : (
+                            categories.map((item) => {
+                                const selected = form.categories.includes(item.value);
+
+                                return (
+                                    <button
+                                        key={item.value}
+                                        type="button"
+                                        onClick={() =>
+                                            setForm({
+                                                ...form,
+                                                categories: toggleValue(
+                                                    form.categories,
+                                                    item.value,
+                                                ),
+                                            })
+                                        }
+                                        aria-pressed={selected}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer transition ${
+                                            selected
+                                                ? "bg-blue-700 text-white border-blue-700"
+                                                : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                                        }`}
+                                    >
+                                        {item.label}
+                                    </button>
+                                );
+                            })
+                        )}
+                    </div>
                 </div>
 
                 <div className="mt-3">

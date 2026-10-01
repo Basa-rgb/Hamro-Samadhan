@@ -5,15 +5,19 @@ import "./index.css";
 import App from "./App.jsx";
 import { BrowserRouter } from "react-router-dom";
 import AuthProvider from "./context/AuthProvider.jsx";
+import CategoriesProvider from "./context/CategoriesProvider.jsx";
 import "leaflet/dist/leaflet.css";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <BrowserRouter>
-      {/* Sits above the router so the session check runs for every route,
-          the admin guard just reads what it finds */}
+      {/* Both sit above the router so their data is fetched once for every
+          route. Categories in particular must not be refetched on navigation,
+          or the public dropdown would flicker on each page change */}
       <AuthProvider>
-        <App />
+        <CategoriesProvider>
+          <App />
+        </CategoriesProvider>
       </AuthProvider>
     </BrowserRouter>
   </StrictMode>,
