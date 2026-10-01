@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Asterisk, Check, MapPin, Lock } from "lucide-react";
 import Upload from "../assets/uploader.jpg";
-import { createReport, getCategories, saveReportToken } from "../../services/ReportService";
+import { createReport, saveReportToken } from "../../services/ReportService";
+import { CATEGORIES } from "../constants/categories";
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
 import { useTranslation } from "react-i18next";
 
@@ -46,8 +47,6 @@ const Report = () => {
   const { t } = useTranslation();
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("");
-  const [categories, setCategories] = useState([]);
-  const [categoriesError, setCategoriesError] = useState(false);
   const [description, setDescription] = useState("");
   const [address, setAddress] = useState("");
   const [name, setName] = useState("");
@@ -93,25 +92,6 @@ const Report = () => {
 
   const clearError = (name) =>
     setErrors((prev) => ({ ...prev, [name]: undefined }));
-
-  // Options come from the backend, so a new category needs no frontend change.
-  // A failed load has to be visible on the field itself, an empty <select> is
-  // indistinguishable from a form that simply has nothing to pick yet
-  const loadCategories = async () => {
-    try {
-      const response = await getCategories();
-      setCategories(response.categories);
-      setCategoriesError(false);
-    } catch {
-      setCategories([]);
-      setCategoriesError(true);
-      setErrorMsg(t("report.errors.loadCategories"));
-    }
-  };
-
-  useEffect(() => {
-    loadCategories();
-  }, [t]);
 
   useEffect(() => {
     return () => {
@@ -347,16 +327,13 @@ const Report = () => {
                   setCategory(e.target.value);
                   clearError("category");
                 }}
-                disabled={categoriesError}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-700 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition cursor-pointer disabled:bg-gray-100 disabled:cursor-not-allowed"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-700 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition cursor-pointer"
               >
                 <option value="" disabled>
-                  {categoriesError
-                    ? t("report.fields.categoryUnavailable")
-                    : t("report.fields.categoryPlaceholder")}
+                  {t("report.fields.categoryPlaceholder")}
                 </option>
 
-                {categories.map((item) => (
+                {CATEGORIES.map((item) => (
                   <option
                     key={item.value}
                     value={item.value}
@@ -368,21 +345,7 @@ const Report = () => {
                   </option>
                 ))}
               </select>
-
-              {categoriesError ? (
-                <p className="text-xs text-red-600 mt-1">
-                  {t("report.errors.loadCategories")}
-                  <button
-                    type="button"
-                    onClick={loadCategories}
-                    className="ml-2 underline cursor-pointer hover:text-red-800"
-                  >
-                    {t("report.fields.retry")}
-                  </button>
-                </p>
-              ) : (
-                fieldError("category")
-              )}
+              {fieldError("category")}
             </div>
 
             {/* Description */}

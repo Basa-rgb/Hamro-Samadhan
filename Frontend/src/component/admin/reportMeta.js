@@ -6,6 +6,9 @@
 //
 // The values match the enums in the Joi validation on the backend, so nothing
 // here can be sent that the server will reject.
+// The categories a citizen can file under are shared with the public report
+// form, so the admin screens and the form cannot disagree about the list
+import { CATEGORY_LABEL } from "../../constants/categories";
 
 export const STATUS_OPTIONS = [
   { value: "PENDING", label: "Pending" },
@@ -63,20 +66,7 @@ const toLabelMap = (options) =>
 
 export const STATUS_LABEL = toLabelMap(STATUS_OPTIONS);
 export const PRIORITY_LABEL = toLabelMap(PRIORITY_OPTIONS);
-
-// The categories a citizen can file under, mirrors Backend/src/constants/categories.js
-export const CATEGORY_LABEL = {
-  road_damage: "Road Damage",
-  road_blockage: "Road Blockage",
-  street_light: "Street Light",
-  waste: "Waste Management",
-  water_leakage: "Water Leakage",
-  drainage: "Drainage",
-  traffic_signal: "Traffic Signal",
-  fallen_tree: "Fallen Tree",
-  public_infrastructure: "Public Infrastructure",
-  other: "Other",
-};
+export { CATEGORY_LABEL };
 
 export const getStatusLabel = (value) => STATUS_LABEL[value] || value;
 export const getPriorityLabel = (value) => PRIORITY_LABEL[value] || value;
