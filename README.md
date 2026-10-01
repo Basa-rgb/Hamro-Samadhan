@@ -94,8 +94,8 @@ Loaded from `.env` by `dotenv` in `src/app.js`. Never commit this file.
 | `CLOUDINARY_CLOUD_NAME` | **Yes** | Cloudinary account name, for report photos. |
 | `CLOUDINARY_API_KEY` | **Yes** | Cloudinary API key. |
 | `CLOUDINARY_API_SECRET` | **Yes** | Cloudinary API secret. |
-| `RESEND_API_KEY` | No | Resend API key used to send notifications. Without it, every send fails and is swallowed. |
-| `EMAIL_FROM` | No | Verified sender address on the Resend domain. Defaults to `onboarding@resend.dev`, which can only send to your own account address. |
+| `GMAIL_USER` | No | Gmail address used as the SMTP sender. Without it, every send fails and is swallowed. |
+| `GMAIL_APP_PASSWORD` | No | 16-character Google app password for `GMAIL_USER`. Use an app password, not the normal Gmail password. |
 | `TRUST_PROXY_HOPS` | No | Number of reverse proxies in front of the app. Needed in production so rate limiting sees real client IPs. |
 | `CLIENT_URL` (multi) | No | `CLIENT_URL` also accepts a **comma separated** list of origins, for when the frontend is reachable on more than one host (Vercel production + preview). |
 | `ADMIN_EMAIL` | No | Only read by `scripts/setStatus.js`. |
@@ -113,8 +113,8 @@ CLOUDINARY_CLOUD_NAME=
 CLOUDINARY_API_KEY=
 CLOUDINARY_API_SECRET=
 
-RESEND_API_KEY=
-EMAIL_FROM=onboarding@resend.dev
+GMAIL_USER=your-gmail-address@gmail.com
+GMAIL_APP_PASSWORD=your-16-character-gmail-app-password
 
 TRUST_PROXY_HOPS=0
 ```
@@ -1255,7 +1255,7 @@ accepts active departments).
 
 ## Email notifications
 
-Every mail is plain text sent through one Resend client, and all four share
+Every mail is plain text sent through one Gmail SMTP transporter, and all four share
 one layout, so a new kind only supplies the text
 (`src/services/notification.service.js`).
 
@@ -1273,13 +1273,11 @@ message blank.
 
 **Email is always best effort.** Every call is wrapped in its own `try/catch` and
 a failure is logged as `Notification error: ...` and swallowed, so a broken
-Resend config can never lose a report or roll back a status change. Resend
-returns failures in the response instead of throwing, so the service re-throws
-them for those log lines to catch.
+Gmail config can never lose a report or roll back a status change.
 
-The sender domain must be verified on the Resend account before real
-recipients can be mailed. Until then `onboarding@resend.dev` works, but only
-delivers to the address that owns the API key.
+Gmail requires two-step verification to be enabled before an app password can
+be created. The app password must be used in `GMAIL_APP_PASSWORD`; the normal
+Gmail account password will usually be rejected by Google SMTP.
 
 ---
 
