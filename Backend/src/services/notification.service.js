@@ -81,6 +81,8 @@ const BRAND = "Hamro Samadhan";
 
 // Every mail shares one sender and one layout, so a new kind only supplies text
 const sendMail = async ({ to, subject, intro, details, message }) => {
+  console.log(`Notification requested; recipient present: ${Boolean(to)}`);
+
   const rows = details.map(([label, value]) => `${label}: ${value}`).join("\n");
 
   const text = `
@@ -108,7 +110,7 @@ ${BRAND}
       "Content-Type: text/plain; charset=UTF-8",
       "",
       text,
-    ].join("\\r\\n");
+    ].join("\r\n");
 
     const response = await fetch(
       "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
