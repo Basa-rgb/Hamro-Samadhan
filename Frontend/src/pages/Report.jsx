@@ -3,7 +3,8 @@ import { Asterisk, Check, Copy, MapPin, Lock } from "lucide-react";
 import Upload from "../assets/uploader.jpg";
 import { createReport, saveReportToken } from "../../services/ReportService";
 import { useClipboard } from "../Hooks/useClipboard";
-import { CATEGORIES } from "../constants/categories";
+import useCategories from "../Hooks/useCategories";
+import useCategoryLabel from "../Hooks/useCategoryLabel";
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
 import { useTranslation } from "react-i18next";
 
@@ -46,6 +47,11 @@ const RecenterMap = ({ latitude, longitude }) => {
 
 const Report = () => {
   const { t } = useTranslation();
+  // The complaint types come from the API, not from a list in this file. The
+  // provider fetches them once for the whole app
+  const { categories, loading: categoriesLoading, error: categoriesError, reload } =
+    useCategories();
+  const getCategoryLabel = useCategoryLabel();
   // Shared with the tracking page, so the copied value is the same and the
   // "Copied" state times itself out instead of sticking until a reload
   const { copied, copy } = useClipboard();
@@ -333,24 +339,57 @@ const Report = () => {
                   setCategory(e.target.value);
                   clearError("category");
                 }}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-700 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition cursor-pointer"
+                // Nothing can be picked while the list is loading or after it
+                // failed, so a citizen cannot submit a value the server does not
+                // know about
+                disabled={categoriesLoading || !categories.length}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-700 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <option value="" disabled>
                   {t("report.fields.categoryPlaceholder")}
                 </option>
 
-                {CATEGORIES.map((item) => (
+                {categories.map((item) => (
                   <option
                     key={item.value}
                     value={item.value}
                     className="cursor-pointer"
                   >
-                    {t(`report.categories.${item.value}`, {
-                      defaultValue: item.label,
-                    })}
+                    {getCategoryLabel(item.value)}
                   </option>
                 ))}
               </select>
+
+              {/* The three states a dropdown can be in that are not "usable", each
+                  one saying what is wrong instead of just looking empty */}
+              {categoriesLoading && (
+                <p className="text-xs text-gray-500 mt-1.5">
+                  {t("report.fields.categoryLoading")}
+                </p>
+              )}
+
+              {!categoriesLoading && categoriesError && (
+                <div className="flex items-center gap-2 mt-1.5">
+                  <p className="text-xs text-red-600 flex-1">
+                    {t("report.fields.categoryLoadFailed")}
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={reload}
+                    className="text-xs font-semibold text-blue-700 hover:text-blue-900 underline cursor-pointer"
+                  >
+                    {t("report.fields.categoryRetry")}
+                  </button>
+                </div>
+              )}
+
+              {!categoriesLoading && !categoriesError && !categories.length && (
+                <p className="text-xs text-gray-500 mt-1.5">
+                  {t("report.fields.categoryEmpty")}
+                </p>
+              )}
+
               {fieldError("category")}
             </div>
 

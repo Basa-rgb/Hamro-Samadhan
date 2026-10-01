@@ -8,7 +8,10 @@
     "start": "node src/server.js",
     "seed:admin": "node scripts/seedAdmin.js",
     "seed:faq": "node scripts/seedFaq.js",
+    "seed:categories": "node scripts/seedCategories.js",
     "seed:departments": "node scripts/seedDepartments.js",
+    "seed:staff": "node scripts/seedStaff.js",
+    "seed:all": "node scripts/seedAll.js",
     "set:status": "node scripts/setStatus.js"
   },
   "keywords": [],

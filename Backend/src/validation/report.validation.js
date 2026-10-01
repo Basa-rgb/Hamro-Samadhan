@@ -1,5 +1,4 @@
 const Joi = require("joi");
-const { categoryValues } = require("../constants/categories");
 
 // Validate location JSON string
 // latitude and longitude are optional, but must stay inside these ranges
@@ -81,8 +80,14 @@ const createReportSchema = Joi.object({
     .max(150)
     .required(),
 
+  // Shape only. Whether the value names a category that currently exists is
+  // checked against the collection in the controller, because the list is data
+  // now and not a compile time constant
   category: Joi.string()
-    .valid(...categoryValues)
+    .trim()
+    .lowercase()
+    .max(60)
+    .pattern(/^[a-z0-9]+(?:_[a-z0-9]+)*$/)
     .required(),
 
   description: Joi.string()
@@ -105,6 +110,20 @@ const listQuerySchema = Joi.object({
   priority: Joi.string()
     .valid("LOW", "MEDIUM", "HIGH", "URGENT")
     .optional(),
+
+  // One complaint type. The admin list filter sends one value. The shape is the
+  // same slug as the stored value, so a filter can never be anything else
+  category: Joi.string()
+    .trim()
+    .lowercase()
+    .max(60)
+    .pattern(/^[a-z0-9]+(?:_[a-z0-9]+)*$/)
+    .optional(),
+
+  // Restricts the list to one department, so an admin can work through a single
+  // queue. The department id is checked in the controller, a query string cannot
+  // be validated as an ObjectId here without the extra import for no gain
+  department: Joi.string().trim().max(24).optional(),
 
   // Free text over the id and title, so an admin can find one report fast
   search: Joi.string().trim().max(100).allow("").optional(),

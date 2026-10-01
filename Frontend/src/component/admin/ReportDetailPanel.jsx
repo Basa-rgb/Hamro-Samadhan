@@ -15,7 +15,8 @@ import {
   getReportUpdates,
 } from "../../../services/AdminService";
 import { Spinner, StatusBadge, PriorityBadge, ErrorBanner } from "./ui";
-import { getCategoryLabel, getStatusLabel } from "./reportMeta";
+import { getStatusLabel } from "./reportMeta";
+import useCategoryLabel from "../../Hooks/useCategoryLabel";
 
 // Declared outside the panel, a component built during render would be a new
 // type on every render and would remount its subtree each time
@@ -57,6 +58,10 @@ const ReportDetailPanel = ({ reportId, onClose, onChanged }) => {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
   const [reloadToken, setReloadToken] = useState(0);
+
+  // Resolved from the API, not from a local list, so a category added in the
+  // portal is labelled correctly here without a deploy
+  const getCategoryLabel = useCategoryLabel();
 
   // The manual refresh bumps the token, which re-runs the effect below
   const handleRefresh = () => {

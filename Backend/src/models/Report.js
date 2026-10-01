@@ -1,6 +1,5 @@
 const mongoose = require("mongoose");
 const crypto = require("crypto");
-const { categoryValues } = require("../constants/categories");
 
 // A complaint filed by a citizen, from submission to resolution
 const ReportSchema = new mongoose.Schema(
@@ -20,11 +19,17 @@ const ReportSchema = new mongoose.Schema(
       maxlength: 150,
     },
 
-    // Fixed list of complaint types the frontend offers
+    // The complaint type, stored as the category's value rather than its id, so a
+    // report keeps its meaning after the category is renamed or retired.
+    // There is no enum here on purpose: the list is data now, and an admin can
+    // add a type without a deploy. Which values are accepted is decided by the
+    // collection, checked in createReport
     category: {
       type: String,
       required: true,
-      enum: categoryValues,
+      trim: true,
+      lowercase: true,
+      index: true,
     },
 
     description: {

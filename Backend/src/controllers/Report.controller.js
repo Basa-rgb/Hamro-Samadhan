@@ -1,13 +1,16 @@
 const Report = require("../models/Report");
 const ReportUpdate = require("../models/ReportUpdate");
 const Department = require("../models/Department");
+const Category = require("../models/Category");
 const generateReportId = require("../utils/generateReportId");
 const uploadToCloudinary = require("../middleware/uploadToCloudinary");
+const { buildReportScope, findScopedReport } = require("../middleware/auth");
 const {
   sendReportSubmitted,
   sendReportStatusChanged,
   sendReportPriorityChanged,
 } = require("../services/notification.service");
+
 const createReport = async (req, res) => {
   try {
     const { title, category, description } = req.body;
@@ -23,6 +26,24 @@ const createReport = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "All fields are required",
+      });
+    }
+
+    // The category is checked against the collection, not against a constant, so
+    // a type an admin has added is accepted and one they have retired is not
+    const categoryDoc = await Category.findOne({ value: category });
+
+    if (!categoryDoc) {
+      return res.status(400).json({
+        success: false,
+        message: "That complaint type is not recognised",
+      });
+    }
+
+    if (!categoryDoc.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: "That complaint type is no longer accepted",
       });
     }
 
@@ -57,15 +78,6 @@ const createReport = async (req, res) => {
     // Upload image if provided
     let photo = null;
 
-    // Debug log of the multipart body, kept to trace client uploads
-    console.log(
-      `[createReport] body keys: ${JSON.stringify(Object.keys(req.body))} | files: ${JSON.stringify(
-        Object.keys(req.files || {}),
-      )} | req.file: ${req.file ? req.file.fieldname : "undefined"} | content-type: ${req.get(
-        "content-type",
-      )}`,
-    );
-
     // Buffer goes straight to Cloudinary, so no temp file touches the disk
     if (req.file) {
       const result = await uploadToCloudinary(req.file.buffer);
@@ -97,7 +109,9 @@ const createReport = async (req, res) => {
         email: report.reporter.email,
         reportId: report.reportId,
         title: report.title,
-        category: report.category,
+        // The label, not the stored value, so the citizen reads "Road Damage"
+        // rather than road_damage in their confirmation mail
+        category: categoryDoc.label,
         location: report.location.address,
       });
     } catch (notificationError) {
@@ -206,12 +220,29 @@ const getReportById = async (req, res) => {
 // getAllReports
 const getAllReports = async (req, res) => {
   try {
-    const { status, priority, search } = req.query;
+    const { status, priority, search, category, department } = req.query;
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 20;
 
-    // Only the filters that were actually sent take part in the query
-    const filter = {};
+    // The caller's department scope is the base the filters below narrow, never
+    // the other way round. Merging it last would let a filter overwrite it
+    const scope = await buildReportScope(req);
+
+    if (scope === null) {
+      // A department admin whose department has no categories can see nothing,
+      // and saying so with an empty page is better than a 500 from an $in: []
+      return res.status(200).json({
+        success: true,
+        count: 0,
+        total: 0,
+        page: 1,
+        limit,
+        totalPages: 1,
+        reports: [],
+      });
+    }
+
+    const filter = { ...scope };
 
     if (status) {
       filter.status = status;
@@ -221,13 +252,31 @@ const getAllReports = async (req, res) => {
       filter.priority = priority;
     }
 
+    if (category) {
+      // Intersected with the scope rather than replacing it, so picking a
+      // category outside a department admin's own list narrows to nothing
+      // instead of unlocking it
+      filter.category = scope.category
+        ? { $in: scope.category.$in.includes(category) ? [category] : [] }
+        : category;
+    }
+
+    if (department) {
+      // An empty string means unassigned, which is a real queue a full admin
+      // works from and has no ObjectId to filter on
+      filter.assignedDepartment = department === "none" ? null : department;
+    }
+
     if (search) {
       // Anchored, escaped regex, so a search term cannot be read as a pattern
       const safeSearch = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      filter.$or = [
-        { reportId: { $regex: safeSearch, $options: "i" } },
-        { title: { $regex: safeSearch, $options: "i" } },
-      ];
+      filter.$and = filter.$and || [];
+      filter.$and.push({
+        $or: [
+          { reportId: { $regex: safeSearch, $options: "i" } },
+          { title: { $regex: safeSearch, $options: "i" } },
+        ],
+      });
     }
 
     const [reports, total] = await Promise.all([
@@ -277,8 +326,48 @@ const PRIORITY_ORDER = ["LOW", "MEDIUM", "HIGH", "URGENT"];
 // getAdminStats
 // Counted in the database, so the overview never has to download every report
 // just to add up a few numbers
+//
+// Every figure is filtered through the caller's department scope first, so a
+// department admin's dashboard describes their own queue and never leaks a total
+// for the whole municipality
 const getAdminStats = async (req, res) => {
   try {
+    const scope = await buildReportScope(req);
+
+    // A department with no categories owns nothing, so every counter is zero
+    // rather than the whole table. An empty result is answered with the same
+    // shape so the dashboard renders instead of breaking on a missing key
+    if (scope === null) {
+      const emptyStatus = {};
+      const emptyPriority = {};
+
+      STATUS_ORDER.forEach((key) => {
+        emptyStatus[key] = 0;
+      });
+
+      PRIORITY_ORDER.forEach((key) => {
+        emptyPriority[key] = 0;
+      });
+
+      return res.status(200).json({
+        success: true,
+        stats: {
+          total: 0,
+          open: 0,
+          unassigned: 0,
+          resolvedThisWeek: 0,
+          activeDepartments: 0,
+          byStatus: emptyStatus,
+          byPriority: emptyPriority,
+          trend: [],
+          recent: [],
+          // Tells the dashboard to say "no categories assigned yet" instead of
+          // showing an empty dashboard that looks broken
+          scopeEmpty: true,
+        },
+      });
+    }
+
     // The seven day keys are built in UTC, which is also the timezone the
     // aggregation below formats with, so the two always line up
     const dayKeys = [];
@@ -302,12 +391,22 @@ const getAdminStats = async (req, res) => {
       activeDepartments,
       recent,
     ] = await Promise.all([
-      Report.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
-
-      Report.aggregate([{ $group: { _id: "$priority", count: { $sum: 1 } } }]),
+      // $match on the scope runs before the grouping, so a department admin's
+      // breakdown only ever counts their own reports
+      Report.aggregate([
+        { $match: scope },
+        { $group: { _id: "$status", count: { $sum: 1 } } },
+      ]),
 
       Report.aggregate([
-        { $match: { createdAt: { $gte: sevenDaysAgo } } },
+        { $match: scope },
+        { $group: { _id: "$priority", count: { $sum: 1 } } },
+      ]),
+
+      Report.aggregate([
+        // Both conditions in one match, otherwise a report outside the scope
+        // filed this week would still land in the trend
+        { $match: { ...scope, createdAt: { $gte: sevenDaysAgo } } },
         {
           $group: {
             _id: {
@@ -322,22 +421,31 @@ const getAdminStats = async (req, res) => {
         },
       ]),
 
-      Report.countDocuments({}),
+      Report.countDocuments(scope),
 
       // Open work with nobody responsible for it yet, the admin's to-do list
       Report.countDocuments({
+        ...scope,
         status: { $in: OPEN_STATUSES },
         assignedDepartment: null,
       }),
 
       Report.countDocuments({
+        ...scope,
         status: "RESOLVED",
         updatedAt: { $gte: sevenDaysAgo },
       }),
 
-      Department.countDocuments({ isActive: true }),
+      // A department admin only ever sees their own department counted, so the
+      // number on their dashboard is never another department's headcount
+      req.user.role === "admin"
+        ? Department.countDocuments({ isActive: true })
+        : Department.countDocuments({
+            _id: req.user.departmentId,
+            isActive: true,
+          }),
 
-      Report.find()
+      Report.find(scope)
         .sort({ createdAt: -1 })
         .limit(5)
         .select("reportId title status priority createdAt")
@@ -385,6 +493,9 @@ const getAdminStats = async (req, res) => {
         // Oldest day first, so a chart can plot it without sorting
         trend: dayKeys.map((date) => ({ date, count: trendCounts[date] || 0 })),
         recent,
+        // Lets the dashboard label the numbers as one department's queue rather
+        // than the whole municipality's
+        scope: req.user.role === "admin" ? null : req.user.departmentName,
       },
     });
   } catch (error) {
@@ -410,14 +521,15 @@ const updateReportStatus = async (req, res) => {
       "RESOLVED",
       "REJECTED",
     ];
-    const report = await Report.findById(id).populate(
-      "assignedDepartment",
-      "name",
-    );
+
+    // Loaded inside the caller's scope, so a department admin cannot advance a
+    // report outside their own categories
+    const report = await findScopedReport(req, id);
+
     if (!report) {
       return res.status(404).json({
         success: false,
-        message: "report not found",
+        message: "Report not found",
       });
     }
 
@@ -427,6 +539,8 @@ const updateReportStatus = async (req, res) => {
         message: "Invalid status",
       });
     }
+
+    await report.populate("assignedDepartment", "name");
 
     report.status = status;
     await report.save();
@@ -472,7 +586,9 @@ const getReportUpdates = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const report = await Report.findById(id);
+    // Inside the caller's scope, so the change history of a report a department
+    // admin may not open is not readable
+    const report = await findScopedReport(req, id);
 
     if (!report) {
       return res.status(404).json({
@@ -510,23 +626,24 @@ const updateReportPriority = async (req, res) => {
     // Priority is freely chosen, unlike the gated status flow
     const priorityStatus = ["LOW", "MEDIUM", "HIGH", "URGENT"];
 
-    const report = await Report.findById(id).populate(
-      "assignedDepartment",
-      "name",
-    );
+    const report = await findScopedReport(req, id);
+
     if (!report) {
       return res.status(404).json({
         success: false,
-        message: "report not found",
+        message: "Report not found",
       });
     }
 
     if (!priorityStatus.includes(priority)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid status",
+        message: "Invalid priority",
       });
     }
+
+    await report.populate("assignedDepartment", "name");
+
     report.priority = priority;
     await report.save();
     // The message is written here, since the admin only sends a priority
@@ -563,10 +680,11 @@ const updateReportPriority = async (req, res) => {
 const getAdminReportById = async (req, res) => {
   try {
     const { id } = req.params;
-    const report = await Report.findById(id).populate(
-      "assignedDepartment",
-      "name description",
-    );
+
+    // Inside the caller's scope, so the full document, reporter contact details
+    // and the photo's storage id never reach a department admin for a report
+    // outside their categories
+    const report = await findScopedReport(req, id);
 
     if (!report) {
       return res.status(404).json({
@@ -574,6 +692,8 @@ const getAdminReportById = async (req, res) => {
         message: "Report not found",
       });
     }
+
+    await report.populate("assignedDepartment", "name description categories");
 
     // Admin view returns the whole document, unlike the trimmed public one
     return res.status(200).json({
