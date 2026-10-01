@@ -6,10 +6,13 @@ const cookieParser = require("cookie-parser");
 const helmet = require("helmet");
 const dotenv = require("dotenv");
 
+// Must run before anything reads process.env. config/cors.js works out its
+// allowed origins the moment it is required, so loading the .env after that
+// require silently left it on its fallback list
+dotenv.config();
+
 const corsMiddleware = require("./config/cors");
 const { apiLimiter } = require("./middleware/rateLimiter");
-
-dotenv.config();
 
 const app = express();
 

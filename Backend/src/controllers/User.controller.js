@@ -11,6 +11,34 @@ const LOGIN_FAILED = {
   message: "Invalid email or password",
 };
 
+// The cookie's Secure flag has to follow how the request actually arrived, not
+// NODE_ENV. A Secure cookie set over plain http is accepted by the browser but
+// then dropped, so the login returns 200 and every later request arrives with no
+// Cookie header. That is what happens when NODE_ENV says production while
+// running on http://localhost, or on a LAN IP, which is the usual local setup
+//
+// SameSite follows from it. A cross site frontend needs None so the browser will
+// send the cookie at all, but None is only legal alongside Secure, so the two are
+// decided together rather than independently
+const isHttps = (req) =>
+  req.secure ||
+  req.headers["x-forwarded-proto"] === "https" ||
+  Boolean(req.headers["x-forwarded-proto"]);
+
+// Kept in one place because the browser matches on every attribute when a cookie
+// is replaced or cleared. A clearCookie that disagrees with the set cookie
+// leaves the original in place
+const cookieOptions = (req) => {
+  const secure = isHttps(req);
+
+  return {
+    httpOnly: true,
+    secure,
+    sameSite: secure ? "none" : "lax",
+    path: "/",
+  };
+};
+
 const login = async (req, res) => {
   const { email, password } = req.body;
 
@@ -41,11 +69,8 @@ const login = async (req, res) => {
     const sessionToken = await Session.createForUser(user._id);
 
     res.cookie("token", sessionToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      ...cookieOptions(req),
       maxAge: 15 * 60 * 1000,
-      path: "/",
     });
 
     return res.status(200).json({
@@ -100,7 +125,7 @@ const logout = async (req, res) => {
     // alone would leave the token usable if it had been copied elsewhere
     await Session.revoke(req.sessionToken);
 
-    res.clearCookie("token", { path: "/" });
+    res.clearCookie("token", cookieOptions(req));
 
     return res.status(200).json({
       success: true,
