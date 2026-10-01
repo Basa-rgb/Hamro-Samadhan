@@ -115,7 +115,14 @@ const createReport = async (req, res) => {
       category: categoryDoc.label,
       location: report.location.address,
     }).catch((notificationError) => {
-      console.log(`Notification error: ${notificationError.message}`);
+      console.log(
+        `Notification error: ${JSON.stringify({
+          code: notificationError.code,
+          responseCode: notificationError.responseCode,
+          command: notificationError.command,
+          message: notificationError.message,
+        })}`,
+      );
     });
 
     return res.status(201).json({

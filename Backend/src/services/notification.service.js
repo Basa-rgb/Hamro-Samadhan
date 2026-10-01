@@ -17,6 +17,20 @@ if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
     socketTimeout: 15000,
   });
   console.log("✅ Gmail email client is ready");
+
+  transporter
+    .verify()
+    .then(() => console.log("✅ Gmail SMTP verification passed"))
+    .catch((error) =>
+      console.log(
+        `❌ Gmail SMTP verification failed: ${JSON.stringify({
+          code: error.code,
+          responseCode: error.responseCode,
+          command: error.command,
+          message: error.message,
+        })}`,
+      ),
+    );
 } else {
   console.error(
     "❌ GMAIL_USER or GMAIL_APP_PASSWORD is missing, notification emails will not be sent",
@@ -36,7 +50,7 @@ const sendMail = async ({ to, subject, intro, details, message }) => {
   }
 
   // Plain text only, so every mail client shows it the same way
-  await transporter.sendMail({
+  const result = await transporter.sendMail({
     from: `"${BRAND}" <${process.env.GMAIL_USER}>`,
     to,
     subject,
@@ -55,6 +69,11 @@ Thank you for helping improve our community.
 ${BRAND}
     `,
   });
+
+  // Log only delivery metadata, never the message contents or credentials.
+  console.log(
+    `Email accepted by Gmail: ${result.messageId} to ${to}`,
+  );
 };
 
 // Status, priority and department mails all report the same snapshot
