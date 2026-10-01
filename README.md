@@ -66,7 +66,7 @@ Check it is alive:
 
 ```bash
 curl http://localhost:5000/api/categories
-# {"success":true,"count":10,"categories":[...]}
+# {"success":true,"count":18,"categories":[...]}
 ```
 
 A JSON 404 confirms routing is up even on an unknown path:
@@ -90,7 +90,7 @@ Loaded from `.env` by `dotenv` in `src/app.js`. Never commit this file.
 | `MONGOOSE_URL` | **Yes** | MongoDB connection string. The app `process.exit(1)`s without it. |
 | `PORT` | No | Port to listen on. Defaults to `5000`. |
 | `NODE_ENV` | No | `production` sets `secure` + `sameSite=none` on the session cookie. |
-| `CLIENT_URL` | No | Browser origin allowed by CORS. Defaults to `http://localhost:5173`. |
+| `CLIENT_URL` | **Yes** in production | Browser origin allowed by CORS. Defaults to `http://localhost:5173`, which blocks a deployed frontend entirely. The server logs a warning on boot in production without it. |
 | `CLOUDINARY_CLOUD_NAME` | **Yes** | Cloudinary account name, for report photos. |
 | `CLOUDINARY_API_KEY` | **Yes** | Cloudinary API key. |
 | `CLOUDINARY_API_SECRET` | **Yes** | Cloudinary API secret. |
@@ -215,8 +215,8 @@ Re-running is safe: it prints `Admin already exists` and exits.
 
 ### `npm run seed:departments`
 
-Inserts 12 departments, chosen so every one of the 10 complaint categories maps
-to at least one of them:
+Inserts 12 departments, chosen so every one of the complaint categories maps to
+at least one of them:
 
 Waste Management · Road Maintenance · Road Obstacle Removal · Street Light ·
 Water Supply · Drainage and Sewerage · Traffic · Public Infrastructure ·
@@ -427,7 +427,7 @@ Base URL: `http://localhost:5000/api`
 | 1 | `POST` | `/api/auth/login` | No | Log in, sets the `token` cookie |
 | 2 | `GET` | `/api/auth/me` | Admin | Current user profile |
 | 3 | `POST` | `/api/auth/logout` | Session | Revoke the session, clear the cookie |
-| 4 | `GET` | `/api/categories` | No | Complaint category list |
+| 4 | `GET` | `/api/categories` | No | Complaint category list (the form does not use it) |
 | 5 | `GET` | `/api/faqs` | No | Active FAQ entries |
 | 6 | `POST` | `/api/reports` | No | Submit a report (multipart, optional image) |
 | 7 | `GET` | `/api/reports/:reportId?token=` | No | Public report lookup, full detail with `token` |
@@ -546,8 +546,9 @@ curl -X POST http://localhost:5000/api/auth/logout -b cookies.txt
 
 ### 4. `GET /api/categories`
 
-Public and static — read from `src/constants/categories.js`, no database. Exists
-so the report form's dropdown is not hardcoded on the client.
+Public and static — read from `src/constants/categories.js`, no database. Kept
+for anything that wants to read the list over HTTP; the report form itself does
+**not** call it, see [Report categories](#report-categories) below.
 
 ```bash
 curl http://localhost:5000/api/categories
@@ -558,7 +559,7 @@ curl http://localhost:5000/api/categories
 ```json
 {
   "success": true,
-  "count": 10,
+  "count": 18,
   "categories": [
     { "value": "road_damage", "label": "Road Damage" },
     { "value": "road_blockage", "label": "Road Blockage" },
@@ -569,13 +570,21 @@ curl http://localhost:5000/api/categories
     { "value": "traffic_signal", "label": "Traffic Signal" },
     { "value": "fallen_tree", "label": "Fallen Tree" },
     { "value": "public_infrastructure", "label": "Public Infrastructure" },
+    { "value": "electricity", "label": "Electricity" },
+    { "value": "sanitation", "label": "Sanitation" },
+    { "value": "pollution", "label": "Pollution" },
+    { "value": "animals", "label": "Stray Animals" },
+    { "value": "construction", "label": "Construction Issue" },
+    { "value": "park", "label": "Park & Playground" },
+    { "value": "safety", "label": "Public Safety" },
+    { "value": "noise", "label": "Noise Complaint" },
     { "value": "other", "label": "Other" }
   ]
 }
 ```
 
 The same file exports `categoryValues`, which is what both the Mongoose `enum`
-and the Joi schema validate against — so the list cannot drift.
+and the Joi schema validate against.
 
 ---
 
@@ -634,7 +643,7 @@ straight to Cloudinary under `hamro-samadhan/reports`; nothing touches disk.
 | Field | Type | Rules |
 | --- | --- | --- |
 | `title` | string | required, trimmed, max 150 |
-| `category` | string | required, one of the 10 categories |
+| `category` | string | required, one of the 18 categories |
 | `description` | string | required, trimmed, max 2000 |
 | `location` | JSON string | required. `address` max 300, required, and rejected if it looks like an email; `latitude` −90..90 and `longitude` −180..180 optional |
 | `reporter` | JSON string | required. `name` max 100, `email` valid, `phone` **exactly 10 digits** |
@@ -1266,7 +1275,27 @@ config can never lose a report or roll back a status change. Gmail requires an
 ### Report categories
 
 `road_damage` · `road_blockage` · `street_light` · `waste` · `water_leakage` ·
-`drainage` · `traffic_signal` · `fallen_tree` · `public_infrastructure` · `other`
+`drainage` · `traffic_signal` · `fallen_tree` · `public_infrastructure` ·
+`electricity` · `sanitation` · `pollution` · `animals` · `construction` ·
+`park` · `safety` · `noise` · `other`
+
+The list lives in **two** files that must be kept in step:
+
+| File | Used for |
+| --- | --- |
+| `Backend/src/constants/categories.js` | the API's own copy: Mongoose `enum`, Joi validation, `GET /api/categories` |
+| `Frontend/src/constants/categories.js` | the report form's dropdown and the admin label map |
+
+The frontend list is hardcoded rather than fetched, because the categories are a
+fixed set of enum values that nothing creates at runtime, so the round trip bought
+nothing while making the form's dropdown fail whenever the API was unreachable
+(most often a CORS miss on `CLIENT_URL`). A failed load used to leave the
+`<select>` silently empty, which looked like a form bug rather than a blocked
+request.
+
+A category added to one file and not the other is rejected on submit by the
+backend validation, and shows its raw value in the admin screens, so check both
+plus the `report.categories.*` keys in `en` and `ne` `translation.json`.
 
 ### Report status
 
@@ -1337,9 +1366,9 @@ Backend/
     │   ├── cors.js              allows CLIENT_URL (list supported) + credentials
     │   └── db.js                mongoose connection
     ├── constants/
-    │   └── categories.js        the 10 categories, single source of truth
+    │   └── categories.js        the 18 categories the API validates against
     ├── controllers/
-    │   ├── Category.controller.js   public category list
+    │   ├── Category.controller.js   public category list (not used by the form)
     │   ├── Faq.controller.js        public FAQ list
     │   ├── Report.controller.js     submit, lookup, list, stats, status, priority, history
     │   ├── User.controller.js       login, me, logout
@@ -1416,9 +1445,14 @@ Both halves are separate deployments, so the frontend must be reachable over
 **HTTPS** for the cross-site cookie to be accepted at all.
 
 **Order to verify a deploy:** open `/admin/login` directly (proves the rewrite),
-log in (proves the cookie), then load `/report` and open the category dropdown
-(proves `GET /api/categories` reaches the API). The category dropdown is the
-quickest check that `VITE_API_URL` resolved correctly.
+log in (proves the cookie and `CLIENT_URL`), then file a report and track it by
+id. The category dropdown is **not** a valid check, it is hardcoded client side
+and renders even when the API is unreachable.
+
+The backend logs a warning on boot when `NODE_ENV=production` and `CLIENT_URL` is
+unset, and the frontend logs one when `VITE_API_URL` is unset. Both mean a
+half-configured deploy, and both are worth reading in the deploy logs before
+assuming a build problem.
 
 Tracking works as the Track page calls it — by ID alone, with the citizen's
 details redacted. The page guards every optional field with `?.` / `||`, so a
