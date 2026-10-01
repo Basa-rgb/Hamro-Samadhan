@@ -1,32 +1,31 @@
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD,
-  },
-  connectionTimeout: 10000,
-  greetingTimeout: 10000,
-  socketTimeout: 10000,
-});
+// The client is only built when a key exists, since the constructor throws,
+// and a missing key must not take the whole server down at boot
+let resend = null;
 
-transporter.verify((error, success) => {
-  if (error) {
-    console.error("❌ Gmail SMTP connection failed:", error);
-  } else {
-    console.log("✅ Gmail SMTP connection is ready");
-  }
-});
+if (process.env.RESEND_API_KEY) {
+  resend = new Resend(process.env.RESEND_API_KEY);
+  console.log("✅ Resend email client is ready");
+} else {
+  console.error(
+    "❌ RESEND_API_KEY is missing, notification emails will not be sent",
+  );
+}
+
 const BRAND = "Hamro Samadhan";
 
 // Every mail shares one sender and one layout, so a new kind only supplies text
 const sendMail = async ({ to, subject, intro, details, message }) => {
   const rows = details.map(([label, value]) => `${label}: ${value}`).join("\n");
 
+  if (!resend) {
+    throw new Error("Resend is not configured, set RESEND_API_KEY");
+  }
+
   // Plain text only, so every mail client shows it the same way
-  await transporter.sendMail({
-    from: `"${BRAND}" <${process.env.EMAIL_USER}>`,
+  const { error } = await resend.emails.send({
+    from: `"${BRAND}" <${process.env.EMAIL_FROM || "onboarding@resend.dev"}>`,
     to,
     subject,
     text: `
@@ -44,6 +43,12 @@ Thank you for helping improve our community.
 ${BRAND}
     `,
   });
+
+  // Resend reports failures in the response instead of throwing,
+  // so raise it here and let the callers log it as before
+  if (error) {
+    throw new Error(error.message);
+  }
 };
 
 // Status, priority and department mails all report the same snapshot
