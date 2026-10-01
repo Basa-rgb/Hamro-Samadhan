@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Asterisk, Check, MapPin, Lock } from "lucide-react";
+import { Asterisk, Check, Copy, MapPin, Lock } from "lucide-react";
 import Upload from "../assets/uploader.jpg";
 import { createReport, saveReportToken } from "../../services/ReportService";
+import { useClipboard } from "../Hooks/useClipboard";
 import { CATEGORIES } from "../constants/categories";
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
 import { useTranslation } from "react-i18next";
@@ -45,6 +46,9 @@ const RecenterMap = ({ latitude, longitude }) => {
 
 const Report = () => {
   const { t } = useTranslation();
+  // Shared with the tracking page, so the copied value is the same and the
+  // "Copied" state times itself out instead of sticking until a reload
+  const { copied, copy } = useClipboard();
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
@@ -57,7 +61,6 @@ const Report = () => {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [errors, setErrors] = useState({});
-  const [copied, setCopied] = useState(false);
   const [preview, setPreview] = useState("");
   const fileInputRef = useRef(null);
   const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -74,7 +77,10 @@ const Report = () => {
     setPhone("");
     setImage(null);
     setErrors({});
-    setCopied(false);
+    // Cleared too, or the next report silently inherits the last one's
+    // coordinates and the map opens on the previous problem
+    setLatitude(null);
+    setLongitude(null);
     if (preview) URL.revokeObjectURL(preview);
     setPreview("");
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -245,29 +251,29 @@ const Report = () => {
 
                   <button
                     type="button"
-                    onClick={async () => {
-                      try {
-                        await navigator.clipboard.writeText(reportId);
-                        setCopied(true);
-                      } catch {
-                        setCopied(false);
-                      }
-                    }}
-                    className="px-4 py-2 text-sm font-semibold text-green-700 border border-green-300 rounded-lg hover:bg-green-100 transition"
+                    onClick={() => copy(reportId)}
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-green-700 border border-green-300 rounded-lg hover:bg-green-100 active:scale-95 transition cursor-pointer"
                   >
+                    {copied ? (
+                      <Check size={16} />
+                    ) : (
+                      <Copy size={16} />
+                    )}
+
                     {copied
                       ? t("report.success.copied")
                       : t("report.success.copyId")}
                   </button>
                 </div>
 
+                <p className="text-xs text-green-600 mt-3">
+                  {t("report.success.keepIdHint")}
+                </p>
+
                 <button
                   type="button"
-                  onClick={() => {
-                    setReportId("");
-                    setCopied(false);
-                  }}
-                  className="mt-4 text-sm font-semibold text-green-700 underline hover:text-green-900"
+                  onClick={() => setReportId("")}
+                  className="mt-4 text-sm font-semibold text-green-700 underline hover:text-green-900 cursor-pointer"
                 >
                   {t("report.success.reportAnother")}
                 </button>
@@ -568,21 +574,25 @@ const Report = () => {
             </div>
 
             {/* Location Status */}
-            <div className="p-4 rounded-lg bg-green-50 border border-green-200 flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center font-bold">
-                <Check />
-              </div>
+            {/* Only once a point actually exists, otherwise it claims a
+                location was detected before the button was ever pressed */}
+            {latitude != null && longitude != null && (
+              <div className="p-4 rounded-lg bg-green-50 border border-green-200 flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center font-bold">
+                  <Check />
+                </div>
 
-              <div>
-                <p className="text-sm font-semibold text-green-700">
-                  {t("report.fields.locationDetected")}
-                </p>
+                <div>
+                  <p className="text-sm font-semibold text-green-700">
+                    {t("report.fields.locationDetected")}
+                  </p>
 
-                <p className="text-xs text-green-600">
-                  {t("report.fields.locationDetectedHint")}
-                </p>
+                  <p className="text-xs text-green-600">
+                    {t("report.fields.locationDetectedHint")}
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Location Preview */}
             <div className="mt-6">

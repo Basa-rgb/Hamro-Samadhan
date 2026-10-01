@@ -47,6 +47,7 @@
       "description": "Save this report ID to track its status.",
       "copyId": "Copy ID",
       "copied": "Copied",
+      "keepIdHint": "You will also receive this ID by email. Quote it when you contact the administration.",
       "reportAnother": "Report another issue"
     },
     "issueSection": {
