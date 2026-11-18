@@ -120,6 +120,7 @@ const createReport = async (req, res) => {
       // rather than road_damage in their confirmation mail
       category: categoryDoc.label,
       location: report.location.address,
+      publicToken: report.publicToken,
     }).catch((notificationError) => {
       console.log(
         `Notification error: ${JSON.stringify({

@@ -1,83 +1,29 @@
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 
-// Render times out outbound SMTP connections. Use Gmail API over HTTPS in
-// production and keep SMTP only as a local fallback.
-let transporter = null;
-const gmailApiConfig = [
-  process.env.GMAIL_USE_API === "true",
-  process.env.GMAIL_CLIENT_ID,
-  process.env.GMAIL_CLIENT_SECRET,
-  process.env.GMAIL_REFRESH_TOKEN,
-].every(Boolean);
+const resendApiKey = process.env.RESEND_API_KEY?.trim();
+const resend = resendApiKey ? new Resend(resendApiKey) : null;
+const emailFrom = process.env.EMAIL_FROM?.trim() || "onboarding@resend.dev";
 
-if (gmailApiConfig) {
-  console.log("✅ Gmail API email client is ready");
-} else if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
-  transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 587,
-    secure: false,
-    requireTLS: true,
-    auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_APP_PASSWORD,
-    },
-    // Do not let a slow SMTP connection keep a report submission pending.
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 15000,
-  });
-  console.log("✅ Gmail email client is ready");
-
-  transporter
-    .verify()
-    .then(() => console.log("✅ Gmail SMTP verification passed"))
-    .catch((error) =>
-      console.log(
-        `❌ Gmail SMTP verification failed: ${JSON.stringify({
-          code: error.code,
-          responseCode: error.responseCode,
-          command: error.command,
-          message: error.message,
-        })}`,
-      ),
-    );
+if (resend) {
+  console.log("✅ Resend email client is ready");
 } else {
-  console.error(
-    "❌ Email configuration is missing: set Gmail API OAuth variables",
-  );
-}
-
-const getGmailAccessToken = async () => {
-  const response = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: process.env.GMAIL_CLIENT_ID,
-      client_secret: process.env.GMAIL_CLIENT_SECRET,
-      refresh_token: process.env.GMAIL_REFRESH_TOKEN,
-      grant_type: "refresh_token",
-    }),
-  });
-
-  const result = await response.json();
-
-  if (!response.ok) {
-    throw new Error(
-      `Gmail OAuth ${response.status}: ${result.error_description || result.error}`,
-    );
-  }
-
-  return result.access_token;
-};
-
-if (gmailApiConfig) {
-  getGmailAccessToken()
-    .then(() => console.log("✅ Gmail API verification passed"))
-    .catch((error) => console.log(`❌ Gmail API verification failed: ${error.message}`));
+  console.error("❌ Email configuration is missing: set RESEND_API_KEY");
 }
 
 const BRAND = "Hamro Samadhan";
+
+const siteUrl = () => {
+  const explicit = process.env.PUBLIC_SITE_URL?.trim();
+  if (explicit) return explicit.replace(/\/+$/, "");
+
+  const firstAllowed = process.env.CLIENT_URL?.split(",")[0]?.trim();
+  if (firstAllowed) return firstAllowed.replace(/\/+$/, "");
+
+  return "http://localhost:5173";
+};
+
+const trackingLink = (reportId, publicToken) =>
+  `${siteUrl()}/track?report=${reportId}&token=${publicToken}`;
 
 // Every mail shares one sender and one layout, so a new kind only supplies text
 const sendMail = async ({ to, subject, intro, details, message }) => {
@@ -100,61 +46,24 @@ Thank you for helping improve our community.
 ${BRAND}
     `;
 
-  if (gmailApiConfig) {
-    const accessToken = await getGmailAccessToken();
-    const rawMessage = [
-      `From: Hamro Samadhan <${process.env.GMAIL_USER}>`,
-      `To: ${to}`,
-      `Subject: ${subject}`,
-      "MIME-Version: 1.0",
-      "Content-Type: text/plain; charset=UTF-8",
-      "",
-      text,
-    ].join("\r\n");
-
-    const response = await fetch(
-      "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
-      {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-        body: JSON.stringify({
-          raw: Buffer.from(rawMessage).toString("base64url"),
-        }),
-      },
-    );
-
-    const result = await response.json();
-
-    if (!response.ok) {
-      throw new Error(
-        `Gmail API ${response.status}: ${result.error?.message || "email rejected"}`,
-      );
-    }
-
-    console.log(`Email accepted by Gmail API: ${result.id} to ${to}`);
-    return;
+  if (!resend) {
+    throw new Error("Email is not configured: set RESEND_API_KEY");
   }
 
-  if (!transporter) {
-    throw new Error(
-      "Email is not configured, set Gmail API OAuth variables",
-    );
-  }
-
-  // Local Gmail fallback; Render uses the Gmail API branch above.
-  const result = await transporter.sendMail({
-    from: `"${BRAND}" <${process.env.GMAIL_USER}>`,
+  const { data, error } = await resend.emails.send({
+    from: `"${BRAND}" <${emailFrom}>`,
     to,
     subject,
     text,
   });
 
+  if (error) {
+    throw new Error(`Resend ${error.name || "error"}: ${error.message}`);
+  }
+
   // Log only delivery metadata, never the message contents or credentials.
   console.log(
-    `Email accepted by Gmail: ${result.messageId} to ${to}`,
+    `Email accepted by Resend: ${data?.id || "unknown"} to ${to}`,
   );
 };
 
@@ -172,7 +81,10 @@ const sendReportSubmitted = async ({
   title,
   category,
   location,
+  publicToken,
 }) => {
+  const link = publicToken ? trackingLink(reportId, publicToken) : null;
+
   await sendMail({
     to: email,
     subject: `Your report ${reportId} has been submitted`,
@@ -182,9 +94,16 @@ const sendReportSubmitted = async ({
       ["Title", title],
       ["Category", category],
       ["Location", location],
+      ...(publicToken ? [["Tracking code", publicToken]] : []),
     ],
-    message:
+    message: [
       "You will receive another email whenever your report is assigned to a department or updated.",
+      link
+        ? `\nView your report: ${link}\nKeep this link private.`
+        : "",
+    ]
+      .filter(Boolean)
+      .join("\n"),
   });
 };
 
